@@ -17,6 +17,8 @@ def rotate(l, k):
 	array([3, 4, 5, 1, 2])
 	'''
 
+	print('an inconsequential change')
+
 	if isinstance(l, list):
 		l_rot = l[k:] + l[:k]
 	else:
