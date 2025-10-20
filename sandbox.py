@@ -88,6 +88,7 @@ def open_some_data():
 		zlevels[id] = np.argmin(dz)
 
 	modelfile = f'{modeldir}/ocn/hist/{runname}.{modelcomp}.hist.am.{mpasFile}.{year:04d}-{month:02d}-{mpasFileDayformat}.nc'
+	print(modelfile)
 	# modelfile = f'{modeldir}/{modelcomp}.hist.am.timeSeriesStatsMonthly.{year:04d}-{month:02d}-{mpasFileDayformat}.nc' # old (v1) filename format
 	ds = xr.open_dataset(modelfile).isel(Time=timeIndex)
 

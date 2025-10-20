@@ -41,7 +41,7 @@ def get_arctic_ocn_region_mask(regions):
 		regions = [regions]
 
 	dsRegionMask = xr.open_dataset(regionMaskDir)
-	all_regions = dsRegionMask.regionNames.data
+	all_regions = dsRegionMask.regionNames.values.astype(str)
 
 	cellMask = None
 	for reg in regions:
@@ -57,6 +57,13 @@ def get_arctic_ocn_region_mask(regions):
 
 	return cellMask
 
+def mpaso_mesh_latlon():
+	mesh = xr.open_dataset(MESHFILE_OCN)
+	lonCell = mesh.lonCell.values
+	latCell = mesh.latCell.values
+	lonCell = 180 / np.pi * lonCell
+	latCell = 180 / np.pi * latCell
+	return latCell, lonCell, mesh.nCells.values
 
 def max_mld_ts_dir(runnum='0151'):
 	return f'/global/cfs/cdirs/m1199/e3sm-arrm-simulations/E3SM-Arcticv2.1_historical{runnum}/timeseries_data/maxMLD/'
@@ -74,14 +81,22 @@ def subset_region_from_ds(region_names, ds):
 
 	return ds.isel(nRegions=idx)
 
-def get_mpaso_var_by_date(varname, year, month):
+def get_mpaso_var_by_date(varname, year, month, runname):
 
-	if year <= 2014:
-		historical = True
+	historical = True
+	if year > 2014:
+		historical = False
+
+	path = E3SM_SIM_PATH + f'E3SM-Arcticv2.1_{runname}/archive/ocn/hist/'
+
+
 
 if __name__ == '__main__':
-	get_arctic_ocn_region_mask('a')
+	get_arctic_ocn_region_mask('Labrador Sea')
+	# mpaso_mesh_latlon()
 
+	# f = xr.open_dataset('/global/cfs/cdirs/m1199/e3sm-arrm-simulations/E3SM-Arcticv2.1_historical0151/archive/ocn/hist/E3SM-Arcticv2.1_historical0151.mpaso.hist.am.timeSeriesStatsMonthlyMax.1960-01-01.nc')
+	# print()
 	# year = 1950
 	# max_mld_file = max_mld_ts_dir() + f'arcticRegions_max_year{year}.nc'
 	#
