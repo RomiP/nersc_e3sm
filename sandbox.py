@@ -184,6 +184,40 @@ def plot_regional_avg_max_mld():
 	plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax)
 	plt.show()
 
+
+def plot_atm_data():
+
+	y = 1950
+	m = 1
+	runname = 'historical0101'
+	root = '/global/cfs/cdirs/m1199/e3sm-arrm-simulations/E3SM-Arcticv2.1_historical0101/archive/atm/hist/'
+	file = f'E3SM-Arcticv2.1_{runname}.eam.h0.{y}-{m:02}.nc'
+	atm = xr.open_dataset(root + file)
+
+	fig, ax = unstructured_pcolor(atm['lat'].values, atm['lon'].values, atm['PSL'].values,
+								  extent=[0, -100, 30, 80], interp=True)
+	plt.show()
+
+
+def playing_with_plotly():
+	import plotly.graph_objects as go
+	fig = go.Figure(data=
+	go.Contour(
+		z=[[10, 10.625, 12.5, 15.625, 20],
+		   [5.625, 6.25, 8.125, 11.25, 15.625],
+		   [2.5, 3.125, 5., 8.125, 12.5],
+		   [0.625, 1.25, 3.125, 6.25, 10.625],
+		   [0, 0.625, 2.5, 5.625, 10]],
+		dx=10,
+		x0=5,
+		dy=10,
+		y0=10,
+	)
+	)
+
+	fig.show()
+
+
 if __name__ == '__main__':
 	print('hello world')
 
@@ -196,4 +230,6 @@ if __name__ == '__main__':
 	# plt.show()
 
 	# unstructured_pcolor(0,0,0)
-	open_some_data()
+	# open_some_data()
+	plot_atm_data()
+	# playing_with_plotly()

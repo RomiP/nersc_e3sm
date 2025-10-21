@@ -32,6 +32,8 @@ def unstructured_pcolor(lat, lon, dat, **kwargs):
 		kwargs['clim'] = [None, None]
 	if not 'landmask' in kwargs:
 		kwargs['landmask'] = False
+	if not 'interp' in kwargs:
+		kwargs['interp'] = False
 
 	# init axes with geo proj
 	projname = 'LambertConformal'
@@ -44,12 +46,26 @@ def unstructured_pcolor(lat, lon, dat, **kwargs):
 		ax.add_feature(cartopy.feature.NaturalEarthFeature(
 			'physical', 'land', '110m', facecolor='grey'), zorder=99)
 	else:
-		ax.add_feature(cartopy.feature.LAND, edgecolor='black')
+		ax.coastlines()
 
 	# todo: add option to interp to grid (for nicer publication figs)
-	sc = ax.scatter(lon, lat, c=dat,
-					s=kwargs['dotsize'], cmap=kwargs['cmap'],
-					marker='o', transform=ccrs.PlateCarree())
+	if kwargs['interp']:
+		from scipy.interpolate import LinearNDInterpolator
+		X = np.linspace(extent[0], extent[1])
+		Y = np.linspace(extent[2], extent[3])
+		# X = np.arange(extent[0], extent[1], 0.1)
+		# Y = np.arange(extent[2], extent[3], 0.1)
+		X, Y = np.meshgrid(X, Y)  # 2D grid for interpolation
+		interp = LinearNDInterpolator(list(zip(lon, lat)), np.squeeze(dat))
+		Z = interp(X, Y)
+		sc = ax.pcolormesh(X, Y, Z, transform=ccrs.PlateCarree())
+	else:
+		sc = ax.scatter(lon, lat, c=dat,
+						s=kwargs['dotsize'], cmap=kwargs['cmap'],
+						marker='o', transform=ccrs.PlateCarree())
+
+	# Set the extent of the map (longitude_min, longitude_max, latitude_min, latitude_max)
+	ax.set_extent(extent, crs=ccrs.PlateCarree())
 
 	cbar = plt.colorbar(sc)
 	if 'clabel' in kwargs:
