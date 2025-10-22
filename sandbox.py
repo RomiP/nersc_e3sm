@@ -195,7 +195,10 @@ def plot_atm_data():
 	atm = xr.open_dataset(root + file)
 
 	fig, ax = unstructured_pcolor(atm['lat'].values, atm['lon'].values, atm['PSL'].values,
-								  extent=[0, -100, 30, 80], interp=True)
+								  extent=[-100, 0, 30, 80],
+								  extenttype='tight',
+								  gridlines=True,
+								  interp=False)
 	plt.show()
 
 
@@ -230,6 +233,6 @@ if __name__ == '__main__':
 	# plt.show()
 
 	# unstructured_pcolor(0,0,0)
-	# open_some_data()
-	plot_atm_data()
+	open_some_data()
+	# plot_atm_data()
 	# playing_with_plotly()

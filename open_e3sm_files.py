@@ -90,6 +90,29 @@ def get_mpaso_var_by_date(varname, year, month, runname):
 	path = E3SM_SIM_PATH + f'E3SM-Arcticv2.1_{runname}/archive/ocn/hist/'
 
 
+def get_atmo_file_by_date(year, month, runname, timestep='h0'):
+	'''
+
+	:param year:
+	:param month:
+	:param runname:
+	:param timestep: h0 - h4
+		h0: monthly averages
+		h1: daily averages
+		h2: 6-hourly averages
+		h3: 6-hourly instantaneous fields
+		h4: other 6-hourly instantaneous fields
+	:return:
+	'''
+
+
+	fileroot = E3SM_SIM_PATH + f'E3SM-Arcticv2.1_{runname}/archive/atm/hist/'
+	fname = f'E3SM-Arcticv2.1_{runname}.eam.{timestep}.{year}-{month:02}.nc'
+
+	return xr.open_dataset(fileroot+fname)
+
+
+
 
 if __name__ == '__main__':
 	get_arctic_ocn_region_mask('Labrador Sea')

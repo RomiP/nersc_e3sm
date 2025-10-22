@@ -1,4 +1,7 @@
 import datetime as dt
+
+import numpy as np
+
 from helpers import *
 import matplotlib
 matplotlib.use('module://backend_interagg')
@@ -78,14 +81,11 @@ def plot_mld_climo():
 
 	files = [
 		'maxMLD_ts_historical.nc',
-		'maxMLD_ts_forecast.nc'
+		# 'maxMLD_ts_forecast.nc'
 	]
 	yr_range = [1950, 2100]
 
 	# Get a specific colormap, e.g., 'viridis'
-	cmap = cm.get_cmap('viridis')
-	# need to normalize because color maps are defined in [0, 1]
-	norm = colors.Normalize(yr_range[0], yr_range[1])# Get a specific colormap, e.g., 'viridis'
 	cmap = cm.get_cmap('viridis')
 	# need to normalize because color maps are defined in [0, 1]
 	norm = colors.Normalize(yr_range[0], yr_range[-1])
@@ -116,9 +116,55 @@ def plot_mld_climo():
 	plt.show()
 
 
+def plot_mld_ts():
+	run = 'historical0301'
+	# run = 'avg'
+	tsroot = '/global/cfs/cdirs/m1199/romina/data/'
+
+	files = [
+		'maxMLD_ts_historical.nc',
+		'maxMLD_ts_forecast.nc'
+	]
+	yr_range = [1950, 2100]
+
+	# Get a specific colormap, e.g., 'viridis'
+	cmap = cm.get_cmap('viridis')
+	# need to normalize because color maps are defined in [0, 1]
+	norm = colors.Normalize(yr_range[0], yr_range[-1])
+
+	for f in files:
+		dat = xr.open_dataset(tsroot + f)
+		if run in dat.runname:
+			dat = dat.sel(runname=run)
+		else:
+			dat = dat.mean(dim='runname')
+
+		mld_annual = np.reshape(dat['maxMLD'].values, (-1, 12))
+		mld_annual = np.max(mld_annual, axis=1)
+		years, months, d = dt64_y_m_d(dat.time.values)
+		years = np.reshape(years, (-1, 12))
+		years = years[:, 0]
+
+		# plt.plot(dat['time'], dat['maxMLD'])
+		plt.plot(years, mld_annual)
+
+
+	plt.xlabel('Date')
+	plt.ylabel('Max MLD (m)')
+	plt.title(f'Labrador Sea Annual Max MLD ({run})')
+
+	ax = plt.gca()
+	ax.invert_yaxis()
+
+	plt.savefig('figs/test2.png')
+	plt.show()
+
 if __name__ == '__main__':
 	runnum = 'historical0201'
-	# make_maxMLD_percentile_ts_dataset()
-	plot_mld_climo()
-
 	# max_mld_percentile_ts(runnum)
+	# make_maxMLD_percentile_ts_dataset()
+
+	# plot_mld_climo()
+	plot_mld_ts()
+
+
