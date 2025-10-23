@@ -57,6 +57,26 @@ def get_arctic_ocn_region_mask(regions):
 
 	return cellMask
 
+def get_nearest_coord_idx(lons, lats, targetcoord):
+	'''
+	determine the index of the nearest point to a target from an
+	unstructured list of coodinate pairs.
+	:param lats: iterable of latitudes
+	:param lons: iterable of longitudes
+	:param targetcoord: [lon, lat]
+	:return:  index of  [lon, lat] coordinate pair nearest the target coordinate
+
+	>>> lons = np.linspace(-20, 0, 20)
+	>>> lats = np.linspace(30, 80, 20)
+	>>> get_nearest_coord_idx(lons, lats, [-19.8, 30.2])
+	0
+	>>> get_nearest_coord_idx(lons, lats, [-7, 61])
+	12
+	'''
+	coords = np.array([lons, lats]).T
+	idx = np.argmin(np.linalg.norm(coords - targetcoord, axis=1))
+	return int(idx)
+
 def mpaso_mesh_latlon():
 	mesh = xr.open_dataset(MESHFILE_OCN)
 	lonCell = mesh.lonCell.values

@@ -1,10 +1,12 @@
 import datetime as dt
+from helpers import *
+import matplotlib.pyplot as plt
+import numpy as np
 from dateutil.relativedelta import relativedelta
 from open_e3sm_files import *
 from tqdm import tqdm
 
 def produce_NAO_ts(runname, startdate, enddate):
-	il_coord = []
 	# Icelow (Akureyri)
 	lat_ice = 65.7
 	lon_ice = -18.1
@@ -25,13 +27,109 @@ def produce_NAO_ts(runname, startdate, enddate):
 		atmodata = get_atmo_file_by_date(date.year, date.month, runname)
 		lat = atmodata.lat.values
 		lon = atmodata.lon.values
-		# todo: vectorize coords to find nearest
-		# idx_il =
+
+		idx_il = get_nearest_coord_idx(lon, lat, [lon_ice, lat_ice])
+		slp = atmodata.PSL.isel(ncol=idx_il)
+		il.append(slp.values)
+
+		idx_ah = get_nearest_coord_idx(lon, lat, [lon_azo, lat_azo])
+		slp = atmodata.PSL.isel(ncol=idx_ah)
+		ah.append(slp.values)
+
+	il = np.array(il)
+	ah = np.array(ah)
+
+	nao = ah - il
+	nao = (nao - np.mean(nao)) / np.std(nao)
+
+	# plt.plot(dates, nao)
+	# plt.show()
+
+	return il, ah, nao, dates
+
+def make_nao_dataset():
+	# startdate = dt.datetime(1950, 1, 1)
+	# enddate = dt.datetime(2015, 1, 1)
+	# runs = ['historical0101', 'historical0151', 'historical0201', 'historical0251', 'historical0301']
+
+	startdate = dt.datetime(2015, 1, 1)
+	enddate = dt.datetime(2096, 1, 1)
+	runs = ['ssp370_0201']
+
+	ds_runs = []
+	for runname in runs:
+		print(runname)
+		il, ah, nao, dates = produce_NAO_ts(runname, startdate, enddate)
+
+		da_il = xr.DataArray(il.reshape(-1, 1), dims=('time', 'runname'), coords={'time': dates, 'runname': [runname]},
+						  name='icelo')
+		da_ah = xr.DataArray(ah.reshape(-1, 1), dims=('time', 'runname'), coords={'time': dates, 'runname': [runname]},
+						  name='azohi')
+		da_nao = xr.DataArray(nao.reshape(-1, 1), dims=('time', 'runname'), coords={'time': dates, 'runname': [runname]},
+						  name='nao')
+		ds = xr.Dataset(
+			{'icelo': da_il, 'azohi': da_ah, 'nao': da_nao},
+		)
+		ds_runs.append(ds)
+
+	ds = xr.concat(ds_runs, dim='runname')
+
+	# ds = xr.Dataset({'maxMLD': da})
+	ds.icelo.attrs['units'] = 'Pa'
+	ds.icelo.attrs['description'] = 'Icelandic low. Sea Level Pressure at Akureyri. coords: [65.7, -18.1]'
+
+	ds.azohi.attrs['units'] = 'Pa'
+	ds.azohi.attrs['description'] = 'Azores High. Sea Level Pressure at Ponta Delgada. coords: [37.7, -25.7]'
+
+	ds.nao.attrs['units'] = 'unitless'
+	ds.nao.attrs['description'] = ('Monthly NAO index calculated from the normalized SLP difference between the azores'
+								   ' high and the icelandic low.')
+
+	ds.to_netcdf('/global/cfs/cdirs/m1199/romina/data/nao_forecast.nc', mode='a')
+
+def nao_seasonal_avg(nao, time, monthrange):
+	'''
+
+	:param nao:
+	:param time:
+	:param monthrange:
+	:return:
+	'''
+
+	y, m, d = dt64_y_m_d(time)
+	# m = np.reshape(m, (-1, 12))
+
+	if monthrange[0] > monthrange[1]:
+		k1 = monthrange[0] - 1
+		k2 = 12 - k1 + monthrange[1]
+		# m = np.roll(m, -k1, axis=1)
+		y = np.roll(y, -k1, axis=0)
+		y = y[:-12]
+
+		nao = np.roll(nao, -k1, axis=0)
+		nao = nao[:-12]
+
+		k1 = 0
+
+	else:
+		k1 = monthrange[0] - 1
+		k2 = monthrange[1]
+
+	y = np.reshape(y, (-1, 12))
+	nao = np.reshape(nao, (-1, 12))
+
+	years = y[:,-1]
+	seasonal = np.nanmean(nao[:, k1:k2], axis=1)
+
+	return seasonal, years
 
 
 if __name__ == '__main__':
+	pass
+	# runname = 'historical0101'
+	# startdate = dt.datetime(1950, 1, 1)
+	# enddate = dt.datetime(2015, 1 ,1)
+	# produce_NAO_ts(runname, startdate, enddate)
 
-	runname = 'historical0101'
-	startdate = dt.datetime(1950, 1, 1)
-	enddate = dt.datetime(2015, 1 ,1)
-	produce_NAO_ts(runname, startdate, enddate)
+	# make_nao_dataset()
+

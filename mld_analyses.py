@@ -1,11 +1,12 @@
 import datetime as dt
+from calendar import monthrange
 
-import numpy as np
-
+from atmo_analyses import nao_seasonal_avg
 from helpers import *
 import matplotlib
 matplotlib.use('module://backend_interagg')
 import matplotlib.pyplot as plt
+import numpy as np
 from dateutil.relativedelta import relativedelta
 from open_e3sm_files import *
 from tqdm import tqdm
@@ -159,12 +160,41 @@ def plot_mld_ts():
 	plt.savefig('figs/test2.png')
 	plt.show()
 
+def plot_mld_vs_nao():
+	run = 'historical0101'
+	monthrange = [10, 3]
+
+	root = '/global/cfs/cdirs/m1199/romina/data/'
+	mldfile = 'maxMLD_ts_historical.nc'
+	naofile = 'nao_historical.nc'
+
+	mlddata = xr.open_dataset(root + mldfile)
+	naodata = xr.open_dataset(root + naofile)
+
+	nao = naodata.sel(runname=run)['nao'].values
+	nao, years = nao_seasonal_avg(nao, naodata.time.values, monthrange)
+
+	mld = mlddata.sel(runname=run)['maxMLD'].values
+	mld = mld.reshape(-1, 12)
+	mld = np.max(mld, axis=1)[:-1]
+
+	plt.scatter(nao, mld)
+	plt.xlabel('NAO index')
+	plt.ylabel('Max MLD (m)')
+
+	plt.show()
+
+
+
+
+
 if __name__ == '__main__':
 	runnum = 'historical0201'
 	# max_mld_percentile_ts(runnum)
 	# make_maxMLD_percentile_ts_dataset()
 
 	# plot_mld_climo()
-	plot_mld_ts()
+	# plot_mld_ts()
+	plot_mld_vs_nao()
 
 
