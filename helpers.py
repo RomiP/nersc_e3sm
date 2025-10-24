@@ -31,3 +31,7 @@ def dt64_y_m_d(date):
 	days = date - date.astype('datetime64[M]') + 1
 	return years, months, days
 
+def normalize(x):
+
+	norm = (x - np.mean(x)) / np.std(x)
+	return norm

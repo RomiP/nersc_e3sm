@@ -1,7 +1,7 @@
 import datetime as dt
 from calendar import monthrange
 
-from atmo_analyses import nao_seasonal_avg
+from atmo_analyses import ts_seasonal_avg
 from helpers import *
 import matplotlib
 matplotlib.use('module://backend_interagg')
@@ -161,7 +161,7 @@ def plot_mld_ts():
 	plt.show()
 
 def plot_mld_vs_nao():
-	run = 'historical0101'
+	run = 'historical0301'
 	monthrange = [10, 3]
 
 	root = '/global/cfs/cdirs/m1199/romina/data/'
@@ -171,16 +171,34 @@ def plot_mld_vs_nao():
 	mlddata = xr.open_dataset(root + mldfile)
 	naodata = xr.open_dataset(root + naofile)
 
-	nao = naodata.sel(runname=run)['nao'].values
-	nao, years = nao_seasonal_avg(nao, naodata.time.values, monthrange)
+	if 'avg' in run:
+		mlddata = mlddata.mean(dim='runname')
+		naodata = naodata.mean(dim='runname')
+	else:
+		naodata = naodata.sel(runname=run)
+		mlddata = mlddata.sel(runname=run)
 
-	mld = mlddata.sel(runname=run)['maxMLD'].values
+	# nao = naodata['nao'].values
+	# nao, years = ts_seasonal_avg(nao, naodata.time.values, monthrange)
+
+	il = naodata['icelo'].values
+	il, years = ts_seasonal_avg(il, naodata.time.values, monthrange)
+
+	ah = naodata['azohi'].values
+	ah, years = ts_seasonal_avg(ah, naodata.time.values, monthrange)
+
+	nao = normalize(ah - il)
+
+	mld = mlddata['maxMLD'].values
 	mld = mld.reshape(-1, 12)
 	mld = np.max(mld, axis=1)[:-1]
 
 	plt.scatter(nao, mld)
 	plt.xlabel('NAO index')
 	plt.ylabel('Max MLD (m)')
+	plt.title(f'E3SM Mean Winter NAO Effect on Max MLD ({run})')
+
+	plt.savefig(f'figs/nao_vs_maxMLD_{run}.png')
 
 	plt.show()
 

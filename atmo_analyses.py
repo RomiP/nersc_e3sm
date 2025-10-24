@@ -87,13 +87,13 @@ def make_nao_dataset():
 
 	ds.to_netcdf('/global/cfs/cdirs/m1199/romina/data/nao_forecast.nc', mode='a')
 
-def nao_seasonal_avg(nao, time, monthrange):
+def ts_seasonal_avg(ts, time, monthrange):
 	'''
 
-	:param nao:
-	:param time:
-	:param monthrange:
-	:return:
+	:param ts: Monthly time series
+	:param time: list of numpy datetime64 objects
+	:param monthrange: [month_start, month_end] as integers (i.e. 1 = Jan)
+	:return: seasonally averaged time series, years
 	'''
 
 	y, m, d = dt64_y_m_d(time)
@@ -106,8 +106,8 @@ def nao_seasonal_avg(nao, time, monthrange):
 		y = np.roll(y, -k1, axis=0)
 		y = y[:-12]
 
-		nao = np.roll(nao, -k1, axis=0)
-		nao = nao[:-12]
+		ts = np.roll(ts, -k1, axis=0)
+		ts = ts[:-12]
 
 		k1 = 0
 
@@ -116,10 +116,10 @@ def nao_seasonal_avg(nao, time, monthrange):
 		k2 = monthrange[1]
 
 	y = np.reshape(y, (-1, 12))
-	nao = np.reshape(nao, (-1, 12))
+	ts = np.reshape(ts, (-1, 12))
 
 	years = y[:,-1]
-	seasonal = np.nanmean(nao[:, k1:k2], axis=1)
+	seasonal = np.nanmean(ts[:, k1:k2], axis=1)
 
 	return seasonal, years
 

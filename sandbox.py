@@ -146,7 +146,9 @@ def open_some_data():
 	fld = (cellMask * fld).where(cellMask, drop=True)
 
 	print('starting image')
-	fig, ax = unstructured_pcolor(lat, lon, fld, landmask=True, dotsize=0.3, clabel=varunits)
+	fig, ax = unstructured_pcolor(lat, lon, fld, landmask=True, dotsize=0.3, clabel=varunits,
+								  extent=[-65, -20, 45, 70],
+								  interp=False)
 	print('done')
 
 	plt.title(vartitle + ' ' + figtitle)
