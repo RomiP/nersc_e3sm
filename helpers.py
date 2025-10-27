@@ -28,7 +28,7 @@ def rotate(l, k):
 def dt64_y_m_d(date):
 	years = date.astype('datetime64[Y]').astype(int) + 1970
 	months = date.astype('datetime64[M]').astype(int) % 12 + 1
-	days = date - date.astype('datetime64[M]') + 1
+	days = date.astype('datetime64[D]') - date.astype('datetime64[M]') + 1
 	return years, months, days
 
 def normalize(x):

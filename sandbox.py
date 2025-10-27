@@ -171,7 +171,7 @@ def plot_regional_avg_max_mld():
 		print(year)
 		max_mld_file = max_mld_ts_dir() + f'arcticRegions_max_year{year}.nc'
 		max_mld = xr.open_dataset(max_mld_file)
-		roi = subset_region(['Labrador Sea'], max_mld)
+		roi = subset_region_from_ds(['Labrador Sea'], max_mld)
 		mld = np.squeeze(roi.maxMLD.data)
 		c = cmap(norm(year))
 		plt.plot(rotate(months, -3), rotate(mld, -3), c=c, alpha=0.8, lw=1)

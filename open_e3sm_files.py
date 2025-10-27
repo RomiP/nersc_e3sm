@@ -2,6 +2,7 @@ import matplotlib.cm as cm
 from matplotlib import colors
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 import xarray as xr
 
 MESHFILE_OCN = ('/global/cfs/cdirs/e3sm/inputdata/ocn/mpas-o/ARRM10to60E2r1/'
@@ -101,35 +102,68 @@ def subset_region_from_ds(region_names, ds):
 
 	return ds.isel(nRegions=idx)
 
-def get_mpaso_var_by_date(varname, year, month, runname):
+def get_e3sm_run_path(runname, component):
+	if runname == 'control':
+		runname = 'E3SMv2.1B60to10rA02'
+		path = E3SM_SIM_PATH + runname
+	elif runname == 'sp370_0101':
+		runname = 'E3SM-Arcticv2.1_ssp370_0101'
+		path = f'/pscratch/sd/d/dcomeau/e3sm_scratch/pm-cpu/{runname}/'
+	else:
+		runname = f'E3SM-Arcticv2.1_{runname}'
+		path = E3SM_SIM_PATH + runname
 
-	historical = True
-	if year > 2014:
-		historical = False
+	path += f'/archive/{component}/hist/'
+	return path, runname
 
-	path = E3SM_SIM_PATH + f'E3SM-Arcticv2.1_{runname}/archive/ocn/hist/'
+
+def get_mpaso_file_by_date(year, month, runname, varname='timeSeriesStatsMonthly'):
+	'''
+	Open and return the netcdf file containing atmospheric data for the specified run number
+	:param year: year [int]
+	:param month: month [int]
+	:param runname: run name [string], use 'control' for 400 yr control spin-up
+	:param varname: output variable type str
+	:return: xarray dataset
+	'''
+	path, runname = get_e3sm_run_path(runname, 'ocn')
+	path += f'{runname}.mpaso.hist.am.{varname}.{year:04}-{month:02}-01.nc'
+
+	if not os.path.exists(path):
+		print(path, ' does not exist')
+		raise FileNotFoundError
+	else:
+		f = xr.open_dataset(path)
+		return f
+
+
+
 
 
 def get_atmo_file_by_date(year, month, runname, timestep='h0'):
 	'''
-
-	:param year:
-	:param month:
-	:param runname:
+	Open and return the netcdf file containing atmospheric data for the specified run number
+	:param year: year [int]
+	:param month: month [int]
+	:param runname: run name [string], use 'control' for 400 yr control spin-up
 	:param timestep: h0 - h4
 		h0: monthly averages
 		h1: daily averages
 		h2: 6-hourly averages
 		h3: 6-hourly instantaneous fields
 		h4: other 6-hourly instantaneous fields
-	:return:
+	:return: xarray dataset
 	'''
 
+	path, runname = get_e3sm_run_path(runname, 'atm')
+	path += f'{runname}.eam.{timestep}.{year:04}-{month:02}.nc'
 
-	fileroot = E3SM_SIM_PATH + f'E3SM-Arcticv2.1_{runname}/archive/atm/hist/'
-	fname = f'E3SM-Arcticv2.1_{runname}.eam.{timestep}.{year}-{month:02}.nc'
-
-	return xr.open_dataset(fileroot+fname)
+	if not os.path.exists(path):
+		print(path, ' does not exist')
+		raise FileNotFoundError
+	else:
+		f = xr.open_dataset(path)
+		return f
 
 
 

@@ -1,7 +1,6 @@
-import datetime as dt
-from calendar import monthrange
-
 from atmo_analyses import ts_seasonal_avg
+from cftime import datetime as cdt
+import datetime as dt
 from helpers import *
 import matplotlib
 matplotlib.use('module://backend_interagg')
@@ -26,13 +25,27 @@ def max_mld_percentile_ts(runname, startdate, enddate):
 
 	dates = []
 	while startdate < enddate:
-		dates.append(startdate)
+
+		if startdate.year < 1000:
+			d = cdt(startdate.year, startdate.month, startdate.day, calendar='noleap')
+			dates.append(d)
+		else:
+			dates.append(startdate)
 		startdate += relativedelta(months=1)
+
 
 	mld = []
 	for date in tqdm(dates):
-		fname = f'E3SM-Arcticv2.1_{runname}.mpaso.hist.am.timeSeriesStatsMonthlyMax.{date.strftime("%Y-%m-%d")}.nc'
-		modeldat = xr.open_dataset(fileroot + fname, engine='netcdf4')
+		# fname = f'E3SM-Arcticv2.1_{runname}.mpaso.hist.am.timeSeriesStatsMonthlyMax.{date.strftime("%Y-%m-%d")}.nc'
+		# modeldat = xr.open_dataset(fileroot + fname, engine='netcdf4')
+		if runname == 'control':
+			fname = (get_e3sm_run_path(runname, 'ocn')[0] +
+					 '../singleVarFiles/maxMLD/'
+					 f'dThreshMLD.E3SMv2.1B60to10rA02.mpaso.hist.am.timeSeriesStatsMonthlyMax.{date.year:04}-{date.month:02}-01.nc')
+			modeldat = xr.open_dataset(fname)
+		else:
+			modeldat = get_mpaso_file_by_date(date.year, date.month, runname, 'timeSeriesStatsMonthlyMax')
+
 		modeldat = modeldat.sel(nCells=ncell)
 		mldmax = np.percentile(modeldat[varname], 95)
 		mld.append(mldmax)
@@ -49,13 +62,17 @@ def max_mld_percentile_ts(runname, startdate, enddate):
 
 
 def make_maxMLD_percentile_ts_dataset():
-	startdate = dt.datetime(1950, 1, 1)
-	enddate = dt.datetime(2015, 1, 1)
-	runs = ['historical0101', 'historical0151', 'historical0201', 'historical0251', 'historical0301']
+	startdate = dt.datetime(1, 1, 1)
+	enddate = dt.datetime(387, 1, 1)
+	runs = ['control']
 
-	startdate = dt.datetime(2015, 1, 1)
-	enddate = dt.datetime(2096, 1, 1)
-	runs = ['ssp370_0201']
+	# startdate = dt.datetime(1950, 1, 1)
+	# enddate = dt.datetime(2015, 1, 1)
+	# runs = ['historical0101', 'historical0151', 'historical0201', 'historical0251', 'historical0301']
+
+	# startdate = dt.datetime(2015, 1, 1)
+	# enddate = dt.datetime(2096, 1, 1)
+	# runs = ['ssp370_0201']
 
 
 	ds = {}
@@ -73,7 +90,7 @@ def make_maxMLD_percentile_ts_dataset():
 	ds.attrs['units'] = 'm'
 	ds.attrs['description'] = 'Labrador Sea region 95th percentile of maxMLD recorded over monthly time period.'
 
-	ds.to_netcdf('/global/cfs/cdirs/m1199/romina/data/maxMLD_ts_forecast.nc', mode='a')
+	ds.to_netcdf('/global/cfs/cdirs/m1199/romina/data/maxMLD_ts_control.nc', mode='a')
 
 def plot_mld_climo():
 
@@ -118,15 +135,18 @@ def plot_mld_climo():
 
 
 def plot_mld_ts():
-	run = 'historical0301'
+	run = 'control'
 	# run = 'avg'
 	tsroot = '/global/cfs/cdirs/m1199/romina/data/'
 
-	files = [
-		'maxMLD_ts_historical.nc',
-		'maxMLD_ts_forecast.nc'
-	]
-	yr_range = [1950, 2100]
+	# files = [
+	# 	'maxMLD_ts_historical.nc',
+	# 	'maxMLD_ts_forecast.nc'
+	# ]
+	# yr_range = [1950, 2100]
+
+	files = ['maxMLD_ts_control.nc']
+	yr_range = [1, 2]
 
 	# Get a specific colormap, e.g., 'viridis'
 	cmap = cm.get_cmap('viridis')
@@ -157,7 +177,7 @@ def plot_mld_ts():
 	ax = plt.gca()
 	ax.invert_yaxis()
 
-	plt.savefig('figs/test2.png')
+	plt.savefig('figs/maxmld_annual_ts_control.png')
 	plt.show()
 
 def plot_mld_vs_nao():
@@ -198,7 +218,7 @@ def plot_mld_vs_nao():
 	plt.ylabel('Max MLD (m)')
 	plt.title(f'E3SM Mean Winter NAO Effect on Max MLD ({run})')
 
-	plt.savefig(f'figs/nao_vs_maxMLD_{run}.png')
+	# plt.savefig(f'figs/nao_vs_maxMLD_{run}.png')
 
 	plt.show()
 
@@ -212,7 +232,7 @@ if __name__ == '__main__':
 	# make_maxMLD_percentile_ts_dataset()
 
 	# plot_mld_climo()
-	# plot_mld_ts()
-	plot_mld_vs_nao()
+	plot_mld_ts()
+	# plot_mld_vs_nao()
 
 
