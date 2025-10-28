@@ -1,3 +1,4 @@
+from cftime import datetime as cdt
 import datetime as dt
 from helpers import *
 import matplotlib.pyplot as plt
@@ -17,7 +18,12 @@ def produce_NAO_ts(runname, startdate, enddate):
 
 	dates = []
 	while startdate < enddate:
-		dates.append(startdate)
+
+		if startdate.year < 1000:
+			d = cdt(startdate.year, startdate.month, startdate.day, calendar='noleap')
+			dates.append(d)
+		else:
+			dates.append(startdate)
 		startdate += relativedelta(months=1)
 
 
