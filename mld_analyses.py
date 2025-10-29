@@ -62,17 +62,17 @@ def max_mld_percentile_ts(runname, startdate, enddate):
 
 
 def make_maxMLD_percentile_ts_dataset():
-	startdate = dt.datetime(1, 1, 1)
-	enddate = dt.datetime(387, 1, 1)
-	runs = ['control']
+	# startdate = dt.datetime(1, 1, 1)
+	# enddate = dt.datetime(387, 1, 1)
+	# runs = ['control']
 
 	# startdate = dt.datetime(1950, 1, 1)
 	# enddate = dt.datetime(2015, 1, 1)
 	# runs = ['historical0101', 'historical0151', 'historical0201', 'historical0251', 'historical0301']
 
-	# startdate = dt.datetime(2015, 1, 1)
-	# enddate = dt.datetime(2096, 1, 1)
-	# runs = ['ssp370_0201']
+	startdate = dt.datetime(2015, 1, 1)
+	enddate = dt.datetime(2097, 1, 1)
+	runs = ['ssp370_0101', 'ssp370_0201']
 
 
 	ds = {}
@@ -90,7 +90,7 @@ def make_maxMLD_percentile_ts_dataset():
 	ds.attrs['units'] = 'm'
 	ds.attrs['description'] = 'Labrador Sea region 95th percentile of maxMLD recorded over monthly time period.'
 
-	ds.to_netcdf('/global/cfs/cdirs/m1199/romina/data/maxMLD_ts_control.nc', mode='a')
+	ds.to_netcdf('/global/cfs/cdirs/m1199/romina/data/maxMLD_ts_forecast.nc', mode='a')
 
 def plot_mld_climo():
 
@@ -181,12 +181,13 @@ def plot_mld_ts():
 	plt.show()
 
 def plot_mld_vs_nao():
-	run = 'historical0301'
+	type = 'historical'
+	run = 'avg'
 	monthrange = [10, 3]
 
 	root = '/global/cfs/cdirs/m1199/romina/data/'
-	mldfile = 'maxMLD_ts_historical.nc'
-	naofile = 'nao_historical.nc'
+	mldfile = f'maxMLD_ts_{type}.nc'
+	naofile = f'nao_{type}.nc'
 
 	mlddata = xr.open_dataset(root + mldfile)
 	naodata = xr.open_dataset(root + naofile)
@@ -195,8 +196,8 @@ def plot_mld_vs_nao():
 		mlddata = mlddata.mean(dim='runname')
 		naodata = naodata.mean(dim='runname')
 	else:
-		naodata = naodata.sel(runname=run)
-		mlddata = mlddata.sel(runname=run)
+		naodata = naodata.sel(runname=type+run)
+		mlddata = mlddata.sel(runname=type+run)
 
 	# nao = naodata['nao'].values
 	# nao, years = ts_seasonal_avg(nao, naodata.time.values, monthrange)
@@ -210,15 +211,19 @@ def plot_mld_vs_nao():
 	nao = normalize(ah - il)
 
 	mld = mlddata['maxMLD'].values
+
 	mld = mld.reshape(-1, 12)
 	mld = np.max(mld, axis=1)[:-1]
 
 	plt.scatter(nao, mld)
 	plt.xlabel('NAO index')
 	plt.ylabel('Max MLD (m)')
-	plt.title(f'E3SM Mean Winter NAO Effect on Max MLD ({run})')
+	plt.title(f'E3SM Mean Winter NAO Effect on Max MLD ({type + run})')
 
-	# plt.savefig(f'figs/nao_vs_maxMLD_{run}.png')
+	corr = np.corrcoef(mld, nao)
+	print(corr)
+
+	# plt.savefig(f'figs/nao_vs_maxMLD_{type + run}.png')
 
 	plt.show()
 
@@ -232,7 +237,7 @@ if __name__ == '__main__':
 	# make_maxMLD_percentile_ts_dataset()
 
 	# plot_mld_climo()
-	plot_mld_ts()
-	# plot_mld_vs_nao()
+	# plot_mld_ts()
+	plot_mld_vs_nao()
 
 

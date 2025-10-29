@@ -1,8 +1,11 @@
+from cftime import datetime	as cdt
+from helpers import MONTHS
 import matplotlib.cm as cm
 from matplotlib import colors
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+from tqdm import tqdm
 import xarray as xr
 
 MESHFILE_OCN = ('/global/cfs/cdirs/e3sm/inputdata/ocn/mpas-o/ARRM10to60E2r1/'
@@ -106,7 +109,7 @@ def get_e3sm_run_path(runname, component):
 	if runname == 'control':
 		runname = 'E3SMv2.1B60to10rA02'
 		path = E3SM_SIM_PATH + runname
-	elif runname == 'sp370_0101':
+	elif runname == 'ssp370_0101':
 		runname = 'E3SM-Arcticv2.1_ssp370_0101'
 		path = f'/pscratch/sd/d/dcomeau/e3sm_scratch/pm-cpu/{runname}/'
 	else:
@@ -136,10 +139,6 @@ def get_mpaso_file_by_date(year, month, runname, varname='timeSeriesStatsMonthly
 		f = xr.open_dataset(path)
 		return f
 
-
-
-
-
 def get_atmo_file_by_date(year, month, runname, timestep='h0'):
 	'''
 	Open and return the netcdf file containing atmospheric data for the specified run number
@@ -165,11 +164,67 @@ def get_atmo_file_by_date(year, month, runname, timestep='h0'):
 		f = xr.open_dataset(path)
 		return f
 
+def get_climatology(varname, month, runtype):
+	fname = '/global/cfs/cdirs/m1199/romina/data/'
+	fname += f'{varname}_climo_m{month:02}_{runtype}.nc'
+	if os.path.exists(fname):
+		return xr.open_dataset(fname)
+
+	runnames = ['control']
+	yearrange = range(1, 387)
+	if runtype == 'historical':
+		runnames = ['historical0101', 'historical0151', 'historical0201', 'historical0251', 'historical0301']
+		yearrange = range(1950, 2015)
+
+	elif runtype == 'forecast':
+		runnames = ['ssp370_0101', 'ssp370_0201']
+		yearrange = range(2015, 2097)
+
+	ocn_fields = {
+		'maxMLD':'timeMonthlyMax_max_dThreshMLD',
+		'filename':'timeSeriesStatsMonthlyMax',
+	}
+
+
+	ds = {}
+	for runname in runnames:
+		print(runname)
+		times_included = []
+		climodat = None
+		for year in tqdm(yearrange):
+			if varname in ocn_fields:
+				modeldat = get_mpaso_file_by_date(year, month, runnames[0], varname=ocn_fields['filename'])
+
+				if climodat is None:
+					climodat = modeldat[ocn_fields[varname]].rename(varname)
+				else:
+					climodat.data += modeldat[ocn_fields[varname]].values
+
+				times_included.append(modeldat.Time[0])
+
+		climodat.data /= len(times_included)
+
+		ds[runname] = climodat
+
+	da = xr.concat(ds.values(), dim='runname')
+	# todo: store dates that were used in producing this climatology
+	ds = xr.Dataset({varname:da,
+					 # 'dates':times_included
+					 })
+	ds.to_netcdf(fname, mode='a')
+
+
+
+
+
+
 
 
 
 if __name__ == '__main__':
-	get_arctic_ocn_region_mask('Labrador Sea')
+	# get_arctic_ocn_region_mask('Labrador Sea')
+
+	get_climatology('maxMLD', 1, 'historical')
 	# mpaso_mesh_latlon()
 
 	# f = xr.open_dataset('/global/cfs/cdirs/m1199/e3sm-arrm-simulations/E3SM-Arcticv2.1_historical0151/archive/ocn/hist/E3SM-Arcticv2.1_historical0151.mpaso.hist.am.timeSeriesStatsMonthlyMax.1960-01-01.nc')

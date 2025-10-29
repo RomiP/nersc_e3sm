@@ -189,7 +189,7 @@ def plot_regional_avg_max_mld():
 
 def plot_atm_data():
 
-	y = 1950
+	y = 1960
 	m = 1
 	runname = 'historical0101'
 	root = '/global/cfs/cdirs/m1199/e3sm-arrm-simulations/E3SM-Arcticv2.1_historical0101/archive/atm/hist/'
@@ -198,9 +198,9 @@ def plot_atm_data():
 
 	fig, ax = unstructured_pcolor(atm['lat'].values, atm['lon'].values, atm['PSL'].values,
 								  extent=[-100, 0, 30, 80],
-								  extenttype='tight',
+								  # extenttype='tight',
 								  gridlines=True,
-								  interp=False)
+								  interp=True)
 	plt.show()
 
 
@@ -222,9 +222,23 @@ def playing_with_plotly():
 
 	fig.show()
 
+def plot_climo():
+
+	lat, lon, cellnum = mpaso_mesh_latlon()
+	file = '/global/cfs/projectdirs/m1199/romina/data/maxMLD_climo_m01_historical.nc'
+	climo = xr.open_dataset(file)
+	climo = climo.mean(dim='runname')
+
+	fig, ax = unstructured_pcolor(lat, lon, climo['maxMLD'].values,
+								 extent=[-70, -30, 50, 70],
+								 # extenttype='tight',
+								 gridlines=True,
+								 interp=False)
+	plt.show()
+
+
 
 if __name__ == '__main__':
-	print('hello world')
 
 	# supported values are ['gtk3agg', 'gtk3cairo', 'gtk4agg', 'gtk4cairo', 'macosx', 'nbagg', 'notebook', 'qtagg', 'qtcairo', 'qt5agg', 'qt5cairo', 'tkagg', 'tkcairo', 'webagg', 'wx', 'wxagg', 'wxcairo', 'agg', 'cairo', 'pdf', 'pgf', 'ps', 'svg', 'template', 'module://backend_interagg', 'inline']
 	matplotlib.use('module://backend_interagg')
@@ -235,6 +249,6 @@ if __name__ == '__main__':
 	# plt.show()
 
 	# unstructured_pcolor(0,0,0)
-	open_some_data()
+	# open_some_data()
 	# plot_atm_data()
-	# playing_with_plotly()
+	plot_climo()
