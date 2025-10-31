@@ -180,6 +180,6 @@ if __name__ == '__main__':
 	# enddate = dt.datetime(2015, 1 ,1)
 	# produce_NAO_ts(runname, startdate, enddate)
 
-	make_nao_dataset()
-	# plot_nao_ts()
+	# make_nao_dataset()
+	plot_nao_ts()
 

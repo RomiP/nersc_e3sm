@@ -223,17 +223,26 @@ def playing_with_plotly():
 	fig.show()
 
 def plot_climo():
-
+	runtype = 'historical'
+	runnum = '0101'
+	varname	= 'maxMLD'
+	month =  1
+	climo = get_climatology(varname, month, runtype)
 	lat, lon, cellnum = mpaso_mesh_latlon()
-	file = '/global/cfs/projectdirs/m1199/romina/data/maxMLD_climo_m01_historical.nc'
-	climo = xr.open_dataset(file)
-	climo = climo.mean(dim='runname')
+	# file = '/global/cfs/projectdirs/m1199/romina/data/maxMLD_climo_m01_historical.nc'
+	# climo = xr.open_dataset(file)
+
+	if runnum == 'avg':
+		climo = climo.mean(dim='runname')
+	else:
+		climo = climo.sel(runname=runtype+runnum)
 
 	fig, ax = unstructured_pcolor(lat, lon, climo['maxMLD'].values,
 								 extent=[-70, -30, 50, 70],
 								 # extenttype='tight',
 								 gridlines=True,
 								 interp=False)
+	plt.title(f'{varname} Climatology month{month:02} run{runtype+runnum}')
 	plt.show()
 
 
@@ -250,5 +259,5 @@ if __name__ == '__main__':
 
 	# unstructured_pcolor(0,0,0)
 	# open_some_data()
-	# plot_atm_data()
+	plot_atm_data()
 	plot_climo()
