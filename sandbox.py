@@ -6,7 +6,7 @@ from open_e3sm_files import *
 import os
 import xarray as xr
 
-from analysis.make_plots import make_scatter_plot
+# from analysis.make_plots import make_scatter_plot
 from mpas_analysis.shared.io.utility import get_files_year_month, decode_strings
 
 from plot_unstructured import *
@@ -245,11 +245,49 @@ def plot_climo():
 	plt.title(f'{varname} Climatology month{month:02} run{runtype+runnum}')
 	plt.show()
 
+def plot_qnet_data():
+	runtype = 'historical'
+	runnum = 'avg'
+	qnet_file = f'/global/cfs/cdirs/m1199/romina/data/netHeatFlux_{runtype}.nc'
+	qnetds = xr.open_dataset(qnet_file)
+
+	if runnum == 'avg':
+		qnetds = qnetds.mean(dim='runname')
+	else:
+		qnetds = qnetds.sel(runname=runtype+runnum)
+
+
+
+
+	# climo for specific months
+	y, m, d = dt64_y_m_d(qnetds.Time.values)
+	idx = np.squeeze(np.argwhere((m <= 3) | (m >= 10)))
+	qnetds = qnetds.isel(Time=idx)
+
+	#  for full year climo
+	qnetds = qnetds.mean(dim='Time')
+
+	lat, lon, cellnum = mpaso_mesh_latlon()
+
+	fig, ax = unstructured_pcolor(lat, lon, qnetds['netHeatFlux'].values,
+								  extent=[-70, -30, 50, 70],
+								  clim=[-300, 100],
+								  cmap='coolwarm',
+								  norm=0,
+								  clabel='Net Heat Flux ($W/m^2$)',
+								  # extenttype='tight',
+								  gridlines=True,
+								  interp=False
+								  )
+	plt.show()
+
 
 
 if __name__ == '__main__':
 
-	# supported values are ['gtk3agg', 'gtk3cairo', 'gtk4agg', 'gtk4cairo', 'macosx', 'nbagg', 'notebook', 'qtagg', 'qtcairo', 'qt5agg', 'qt5cairo', 'tkagg', 'tkcairo', 'webagg', 'wx', 'wxagg', 'wxcairo', 'agg', 'cairo', 'pdf', 'pgf', 'ps', 'svg', 'template', 'module://backend_interagg', 'inline']
+	# supported values are ['gtk3agg', 'gtk3cairo', 'gtk4agg', 'gtk4cairo', 'macosx', 'nbagg', 'notebook', 'qtagg',
+	# 'qtcairo', 'qt5agg', 'qt5cairo', 'tkagg', 'tkcairo', 'webagg', 'wx', 'wxagg', 'wxcairo', 'agg', 'cairo', 'pdf',
+	# 'pgf', 'ps', 'svg', 'template', 'module://backend_interagg', 'inline']
 	matplotlib.use('module://backend_interagg')
 	print(matplotlib.get_backend())
 
@@ -259,5 +297,10 @@ if __name__ == '__main__':
 
 	# unstructured_pcolor(0,0,0)
 	# open_some_data()
-	plot_atm_data()
-	plot_climo()
+	# plot_atm_data()
+	# plot_climo()
+	plot_qnet_data()
+
+	path = '/global/cfs/projectdirs/m1199/e3sm-arrm-simulations/TL319_r05_ARRM10to60E2r1.JRA-MOSART-Phys/archive/ocn/hist/'
+	fname = 'TL319_r05_ARRM10to60E2r1.JRA-MOSART-Phys.mpaso.hist.am.eddyProductVariables.1991-01-01.nc'
+	dat = xr.open_dataset(path + fname)

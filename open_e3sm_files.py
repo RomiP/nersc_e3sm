@@ -119,6 +119,9 @@ def get_e3sm_run_path(runname, component):
 	path += f'/archive/{component}/hist/'
 	return path, runname
 
+def get_control_singlevar_file(varname, component):
+	# todo: make this work
+	path = get_e3sm_run_path(runname='control', component=component)[0] + '../{varname}'
 
 def get_mpaso_file_by_date(year, month, runname, varname='timeSeriesStatsMonthly'):
 	'''
@@ -203,7 +206,6 @@ def get_climatology(varname, month, runtype):
 							 f'dThreshMLD.E3SMv2.1B60to10rA02.mpaso.hist.am.timeSeriesStatsMonthlyMax.{year:04}-{month:02}-01.nc')
 					modeldat = xr.open_dataset(fpath)
 				else:
-
 					modeldat = get_mpaso_file_by_date(year, month, runnames[0], varname=ocn_fields['filename'])
 
 				if climodat is None:
@@ -219,7 +221,6 @@ def get_climatology(varname, month, runtype):
 		ds[runname] = climodat
 
 	da = xr.concat(ds.values(), dim='runname')
-	# todo: store dates that were used in producing this climatology
 	ds = xr.Dataset({varname:da})
 	ds['dates_included'] = times_included
 	ds.to_netcdf(fname)

@@ -1,11 +1,27 @@
+import bokeh.palettes
 import cartopy
 import cartopy.crs as ccrs
+import holoviews as hv
+import matplotlib.colors as cm
+from matplotlib.colors import TwoSlopeNorm, ListedColormap
+from matplotlib.ticker import FixedLocator
 import matplotlib.path as mpath
 import matplotlib.pyplot as plt
 import cartopy.mpl.ticker as ctk
 import numpy as np
 from scipy.interpolate import griddata
 
+
+class MidpointNormalize(cm.Normalize):
+    def __init__(self, vmin=None, vmax=None, midpoint=None, clip=False):
+        self.midpoint = midpoint
+        cm.Normalize.__init__(self, vmin, vmax, clip)
+
+    def __call__(self, value, clip=None):
+        # I'm ignoring masked values and all kinds of edge cases to make a
+        # simple example...
+        x, y = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
+        return np.ma.masked_array(np.interp(value, x, y))
 
 def _init_proj(proj_name, **kwargs):
 	if proj_name == 'LambertConformal':
@@ -60,6 +76,28 @@ def unstructured_pcolor(lat, lon, dat, **kwargs):
 		kwargs['landmask'] = False
 	if not 'interp' in kwargs:
 		kwargs['interp'] = False
+	if not 'norm' in kwargs:
+		kwargs['norm'] = None
+	else:
+		norm = kwargs['norm']
+		vmin, vmax = kwargs['clim']
+		kwargs['norm'] = None
+		# kwargs['norm'] = MidpointNormalize(midpoint=kwargs['norm'],
+		# 								   vmin=vmin, vmax=vmax)
+
+
+		if vmax is not None and vmin is not None:
+			rng = max(abs(vmax), abs(vmin))
+			norm = cm.Normalize(vmin=-rng+norm, vmax=rng+norm)
+
+			# Truncate colormap
+			cmap_full = plt.colormaps[kwargs['cmap']]
+			cmap_trunc = ListedColormap(cmap_full(np.linspace(norm(vmin), norm(vmax), 256)))
+			kwargs['cmap'] = cmap_trunc
+		#
+		# kwargs['norm'] = TwoSlopeNorm(vcenter=kwargs['norm'],
+		# 							  vmin=kwargs['clim'][0],
+		# 							  vmax=kwargs['clim'][1])
 
 	# init axes with geo proj
 	projname = 'LambertConformal'
@@ -85,12 +123,14 @@ def unstructured_pcolor(lat, lon, dat, **kwargs):
 		X, Y = np.meshgrid(X, Y)  # 2D grid for interpolation
 		coords = np.array([lon, lat]).T
 		Z = griddata(coords, np.squeeze(dat), (X, Y), method='nearest')
-		sc = ax.pcolormesh(X, Y, Z, cmap=kwargs['cmap'], transform=ccrs.PlateCarree())
-
+		sc = ax.pcolormesh(X, Y, Z, cmap=kwargs['cmap'], clim=kwargs['clim'],
+							norm=kwargs['norm'],
+						   transform=ccrs.PlateCarree())
 
 	else:
 		sc = ax.scatter(lon, lat, c=dat,
-						s=kwargs['dotsize'], cmap=kwargs['cmap'],
+						s=kwargs['dotsize'], cmap=kwargs['cmap'], clim=kwargs['clim'],
+						norm=kwargs['norm'],
 						marker='o', transform=ccrs.PlateCarree())
 
 
@@ -121,6 +161,15 @@ def unstructured_pcolor(lat, lon, dat, **kwargs):
 	if 'clabel' in kwargs:
 		cbar.set_label(kwargs['clabel'])
 
+
+	# if kwargs['norm'] is not None:
+	# 	vmin, vmax = sc.get_clim()
+	# 	# Proportional ticks(linear in data	space)
+	# 	# ticks = np.linspace(vmin, vmax, 6)
+	# 	ticks = np.concat([np.linspace(vmin, 0, 6), np.linspace(0, vmax, 2)])
+	# 	print(ticks)
+	# 	cbar.set_ticks(ticks)
+	# 	cbar.ax.yaxis.set_major_locator(FixedLocator(ticks))
 
 	if 'gridlines' in kwargs and kwargs['gridlines']:
 		gl = ax.gridlines(draw_labels=True, x_inline=False, y_inline=False, linestyle='dashed')
