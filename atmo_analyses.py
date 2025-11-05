@@ -53,18 +53,8 @@ def produce_NAO_ts(runname, startdate, enddate):
 
 	return il, ah, nao, dates
 
-def make_nao_dataset():
-	# startdate = dt.datetime(1, 1, 1)
-	# enddate = dt.datetime(387, 1, 1)
-	# runs = ['control']
+def make_nao_dataset(startdate, enddate, runs):
 
-	# startdate = dt.datetime(1950, 1, 1)
-	# enddate = dt.datetime(2015, 1, 1)
-	# runs = ['historical0101', 'historical0151', 'historical0201', 'historical0251', 'historical0301']
-
-	startdate = dt.datetime(2015, 1, 1)
-	enddate = dt.datetime(2097, 1, 1)
-	runs = ['ssp370_0101', 'ssp370_0201']
 
 	ds_runs = []
 	for runname in runs:
@@ -173,13 +163,68 @@ def plot_nao_ts():
 	plt.title('Seasonal Average (Oct-Mar) NAO Index')
 	plt.show()
 
-if __name__ == '__main__':
-	# pass
-	# runname = 'historical0101'
-	# startdate = dt.datetime(1950, 1, 1)
-	# enddate = dt.datetime(2015, 1 ,1)
-	# produce_NAO_ts(runname, startdate, enddate)
+def make_qnet_field(startdate, enddate, runs, type):
 
+	# units = W/m^2, positive into ocean
+	dates = make_monthly_date_list(startdate, enddate)
+	# ocn_dat  = get_mpaso_file_by_date(1950, 1, runs[0])
+	prefix = 'timeMonthly_avg_'
+	heat_varnames = ['latentHeatFlux', 'longWaveHeatFluxDown', 'longWaveHeatFluxUp', 'sensibleHeatFlux', 'shortWaveHeatFlux']
+	heat_varnames = [prefix + i for i in heat_varnames]
+	print()
+
+	def _sum_vars(ds, vars, newname=None):
+		mysum = ds[vars[0]]
+		for var in vars[1:]:
+			mysum.data += ds[var].data
+
+		return mysum.rename(newname)
+
+	ds = {}
+	for runname in runs:
+		print(runname)
+		da = None
+		for d in tqdm(dates):
+			ocn_dat = get_mpaso_file_by_date(d.year, d.month, runname)
+			if da is None:
+				da = _sum_vars(ocn_dat, heat_varnames, newname='netHeatFlux')
+			else:
+				da = xr.concat([da, _sum_vars(ocn_dat, heat_varnames, newname='netHeatFlux')], dim='Time')
+
+		ds[runname] = da
+
+	da = xr.concat(ds.values(), dim='runname')
+	ds = xr.Dataset({'netHeatFlux': da})
+	ds.attrs['units'] = 'W/m^2'
+	ds.attrs['description'] = 'Net heat flux into the ocean'
+	ds.attrs['Summed variables'] = heat_varnames
+
+	ds.to_netcdf(f'/global/cfs/cdirs/m1199/romina/data/netHeatFlux_{type}.nc')
+
+
+if __name__ == '__main__':
+	# %% date ranges and params
+
+	# startdate = dt.datetime(1, 1, 1)
+	# enddate = dt.datetime(387, 1, 1)
+	# type = 'control'
+	# runs = ['control']
+
+	startdate = dt.datetime(1950, 1, 1)
+	enddate = dt.datetime(2015, 1, 1)
+	type = 'historical'
+	runs = ['historical0101', 'historical0151', 'historical0201', 'historical0251', 'historical0301']
+
+	# startdate = dt.datetime(2015, 1, 1)
+	# enddate = dt.datetime(2097, 1, 1)
+	# type = 'forecast'
+	# runs = ['ssp370_0101', 'ssp370_0201']
+
+	# %% Do stuff
+
+	# produce_NAO_ts(runname, startdate, enddate)
 	# make_nao_dataset()
-	plot_nao_ts()
+	# plot_nao_ts()
+
+	make_qnet_field(startdate, enddate, runs, type)
 
