@@ -71,7 +71,7 @@ def make_monthly_date_list(startdate:dt.datetime, enddate:dt.datetime) -> list[d
 	return dates
 
 
-def geopolygon_mask(geojson_polygon: str, coords_array: np.ndarray) -> np.ndarray:
+def geopolygon_mask(geojson_polygon: str, lons: np.ndarray, lats:np.ndarray) -> np.ndarray:
 	"""
 	Determine whether each point in a 2D array of [longitude, latitude] coordinates
 	lies inside a GeoJSON polygon using Shapely's vectorized API.
@@ -81,13 +81,15 @@ def geopolygon_mask(geojson_polygon: str, coords_array: np.ndarray) -> np.ndarra
 	geojson_polygon : string
 		A GeoJSON dictionary representing a Polygon or MultiPolygon.
 		*** Note when casting dict to str: make sure nested strings (i.e. dict keys) are noted with double quotes -> ""
-	coords_array : np.ndarray
-		A NumPy array of shape (N, 2), where each row is [longitude, latitude].
+	lons : np.ndarray
+		A NumPy 1-D array of length N.
+	lats : np.ndarray
+		A NumPy 1-D array of length N.
 
 	Returns
 	-------
 	np.ndarray
-		A NumPy array of shape (N,) with 1 if the point is inside the polygon, else 0.
+		A NumPy array of shape (N,) with boolean value True if the point is inside the polygon, else False.
 
 	Examples
 	--------
@@ -106,21 +108,24 @@ def geopolygon_mask(geojson_polygon: str, coords_array: np.ndarray) -> np.ndarra
 	...	}
 	... '''
 	>>> coords = np.array([[-79.5, 25.5], [-54.1, 58.6], [-80.1, 25.2]])
-	>>> print(geopolygon_mask(geojson_poly, coords))
+	>>> lons = np.array([-79.5, -54.1, -80.1])
+	>>> lats = np.array([25.5, 58.6, 25.2])
+	>>> print(geopolygon_mask(geojson_poly, lons, lats))
 	[1 0 0]
 	>>> poly_file = '/global/cfs/projectdirs/m1199/romina/PycharmProjects/nersc/test_files/labsea_test.geojson'
 	>>> my_json = open(poly_file).read()
-	>>> print(geopolygon_mask(my_json, coords))
+	>>> print(geopolygon_mask(my_json, lons, lats))
 	[0 1 0]
 	"""
 	# Convert GeoJSON (as a string) to Shapely geometry
 	polygon = shapely.from_geojson(geojson_polygon)
 
 	# Create Shapely points from coordinates
-	points = shapely.points(coords_array[:, 0], coords_array[:, 1])
+	points = shapely.points(lons, lats)
 
-	# Check containment and convert boolean to int
-	return shapely.contains(polygon, points).astype(int)
+
+	# Check containment
+	return shapely.contains(polygon, points)
 
 
 
