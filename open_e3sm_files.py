@@ -87,6 +87,7 @@ def mpaso_mesh_latlon():
 	latCell = mesh.latCell.values
 	lonCell = 180 / np.pi * lonCell
 	latCell = 180 / np.pi * latCell
+	lonCell[lonCell > 180] -= 360
 	return latCell, lonCell, mesh.nCells.values
 
 def max_mld_ts_dir(runnum='0151'):

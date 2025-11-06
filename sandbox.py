@@ -277,8 +277,11 @@ def plot_qnet_data():
 								  clabel='Net Heat Flux ($W/m^2$)',
 								  # extenttype='tight',
 								  gridlines=True,
-								  interp=False
+								  interp=False,
+								  title=runtype + runnum + ' Oct-Mar',
 								  )
+
+	plt.savefig(f'figs/qnet_climo_oct-mar_{runtype}{runnum}.png')
 	plt.show()
 
 
@@ -301,6 +304,6 @@ if __name__ == '__main__':
 	# plot_climo()
 	plot_qnet_data()
 
-	path = '/global/cfs/projectdirs/m1199/e3sm-arrm-simulations/TL319_r05_ARRM10to60E2r1.JRA-MOSART-Phys/archive/ocn/hist/'
-	fname = 'TL319_r05_ARRM10to60E2r1.JRA-MOSART-Phys.mpaso.hist.am.eddyProductVariables.1991-01-01.nc'
-	dat = xr.open_dataset(path + fname)
+	# path = '/global/cfs/projectdirs/m1199/e3sm-arrm-simulations/TL319_r05_ARRM10to60E2r1.JRA-MOSART-Phys/archive/ocn/hist/'
+	# fname = 'TL319_r05_ARRM10to60E2r1.JRA-MOSART-Phys.mpaso.hist.am.eddyProductVariables.1991-01-01.nc'
+	# dat = xr.open_dataset(path + fname)

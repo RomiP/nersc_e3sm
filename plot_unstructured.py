@@ -161,6 +161,8 @@ def unstructured_pcolor(lat, lon, dat, **kwargs):
 	if 'clabel' in kwargs:
 		cbar.set_label(kwargs['clabel'])
 
+	if 'title' in kwargs:
+		plt.title(kwargs['title'])
 
 	# if kwargs['norm'] is not None:
 	# 	vmin, vmax = sc.get_clim()
