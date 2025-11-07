@@ -140,22 +140,24 @@ def open_some_data():
 	fld = ds[mpasvarname]
 	cindices = colorIndices
 
-	# fld = (localArea * fld.where(cellMask, drop=True)).sum(dim='nCells') / regionalArea
-	lon = (cellMask * lonCell).where(cellMask, drop=True)
-	lat = (cellMask * latCell).where(cellMask, drop=True)
-	fld = (cellMask * fld).where(cellMask, drop=True)
+	# # fld = (localArea * fld.where(cellMask, drop=True)).sum(dim='nCells') / regionalArea
+	# lon = (cellMask * lonCell).where(cellMask, drop=True)
+	# lat = (cellMask * latCell).where(cellMask, drop=True)
+	# fld = (cellMask * fld).where(cellMask, drop=True)
+
+	lat = latCell
+	lon = lonCell
 
 	print('starting image')
-	fig, ax = unstructured_pcolor(lat, lon, fld, landmask=True, dotsize=0.3, clabel=varunits,
-								  extent=[-65, -20, 45, 70],
+	fig, ax = unstructured_pcolor(lat, lon, fld, landmask=True, dotsize=dotSize, clabel=varunits,
+								  extent=[-70, -30, 50, 70],
 								  interp=False)
 	print('done')
 
 	plt.title(vartitle + ' ' + figtitle)
 	plt.show()
 
-	# make_scatter_plot(lon, lat, dotSize, figtitle,
-	# 				  fld=fld, cmap=colormap, clevels=clevels, cindices=cindices, cbarLabel=varunits)
+
 
 def plot_regional_avg_max_mld():
 	months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -299,10 +301,10 @@ if __name__ == '__main__':
 	# plt.show()
 
 	# unstructured_pcolor(0,0,0)
-	# open_some_data()
+	open_some_data()
 	# plot_atm_data()
 	# plot_climo()
-	plot_qnet_data()
+	# plot_qnet_data()
 
 	# path = '/global/cfs/projectdirs/m1199/e3sm-arrm-simulations/TL319_r05_ARRM10to60E2r1.JRA-MOSART-Phys/archive/ocn/hist/'
 	# fname = 'TL319_r05_ARRM10to60E2r1.JRA-MOSART-Phys.mpaso.hist.am.eddyProductVariables.1991-01-01.nc'

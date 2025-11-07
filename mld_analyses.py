@@ -228,7 +228,51 @@ def plot_mld_vs_nao():
 	plt.show()
 
 
+def plot_mld_vs_qnet():
+	type = 'historical'
+	run = 'avg'
+	monthrange = [10, 3]
 
+	root = '/global/cfs/cdirs/m1199/romina/data/timeseries/'
+	mldfile = f'maxMLD_ts_{type}.nc'
+	qnetfile = f'netHeatFlux_{type}.nc'
+
+	mlddata = xr.open_dataset(root + mldfile)
+	qnetdata = xr.open_dataset(root + qnetfile)
+
+	if 'avg' in run:
+		mlddata = mlddata.mean(dim='runname')
+		qnetdata = qnetdata.mean(dim='runname')
+	else:
+		qnetdata = qnetdata.sel(runname=type + run)
+		mlddata = mlddata.sel(runname=type + run)
+
+
+	qnet = qnetdata['netHeatFlux'].values
+	mld = mlddata['maxMLD'].values
+
+	qnet, years = ts_seasonal_avg(qnet, qnetdata.Time.values, monthrange)
+
+	mld = mld.reshape(-1, 12)
+	mld = np.max(mld, axis=1)[:-1]
+
+	plt.scatter(qnet, mld)
+	plt.xlabel('Net Heat Flux ($W/m^2$)')
+	plt.ylabel('Max MLD (m)')
+	plt.title(f'E3SM Mean Winter Q_net Effect on Max MLD ({type + run})')
+
+	plt.xlim(-325, -50)
+
+	corr = np.corrcoef(mld, qnet)[0, 1]
+	r2 = round(corr ** 2, 4)
+	print(corr)
+
+	ax = plt.gca()
+	plt.text(.05, 0.05, f'$R^2$ = {r2}', ha='left', va='bottom', transform=ax.transAxes)
+	# ax.invert_yaxis()
+	plt.savefig(f'figs/qnet_vs_maxMLD_{type + run}.png')
+
+	plt.show()
 
 
 if __name__ == '__main__':
@@ -238,6 +282,7 @@ if __name__ == '__main__':
 
 	# plot_mld_climo()
 	# plot_mld_ts()
-	plot_mld_vs_nao()
+	# plot_mld_vs_nao()
+	plot_mld_vs_qnet()
 
 
