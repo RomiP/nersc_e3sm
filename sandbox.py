@@ -250,7 +250,7 @@ def plot_climo():
 def plot_qnet_data():
 	runtype = 'historical'
 	runnum = 'avg'
-	qnet_file = f'/global/cfs/cdirs/m1199/romina/data/netHeatFlux_{runtype}.nc'
+	qnet_file = f'/global/cfs/cdirs/m1199/romina/data/composite_fields/netHeatFlux_{runtype}.nc'
 	qnetds = xr.open_dataset(qnet_file)
 
 	if runnum == 'avg':
@@ -272,6 +272,7 @@ def plot_qnet_data():
 	lat, lon, cellnum = mpaso_mesh_latlon()
 
 	fig, ax = unstructured_pcolor(lat, lon, qnetds['netHeatFlux'].values,
+								  projname='Miller',
 								  extent=[-70, -30, 50, 70],
 								  clim=[-300, 100],
 								  cmap='coolwarm',
@@ -279,7 +280,7 @@ def plot_qnet_data():
 								  clabel='Net Heat Flux ($W/m^2$)',
 								  # extenttype='tight',
 								  gridlines=True,
-								  interp=False,
+								  interp='mosaic',
 								  title=runtype + runnum + ' Oct-Mar',
 								  )
 
@@ -301,10 +302,10 @@ if __name__ == '__main__':
 	# plt.show()
 
 	# unstructured_pcolor(0,0,0)
-	open_some_data()
+	# open_some_data()
 	# plot_atm_data()
 	# plot_climo()
-	# plot_qnet_data()
+	plot_qnet_data()
 
 	# path = '/global/cfs/projectdirs/m1199/e3sm-arrm-simulations/TL319_r05_ARRM10to60E2r1.JRA-MOSART-Phys/archive/ocn/hist/'
 	# fname = 'TL319_r05_ARRM10to60E2r1.JRA-MOSART-Phys.mpaso.hist.am.eddyProductVariables.1991-01-01.nc'
