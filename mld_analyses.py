@@ -92,16 +92,19 @@ def make_maxMLD_percentile_ts_dataset():
 
 	ds.to_netcdf('/global/cfs/cdirs/m1199/romina/data/maxMLD_ts_forecast.nc', mode='a')
 
-def plot_mld_climo():
+def plot_mld_climo(runnum):
 
-	run = 'historical0301'
-	tsroot = '/global/cfs/cdirs/m1199/romina/data/'
+	tsroot = '/global/cfs/cdirs/m1199/romina/data/timeseries/'
 
 	files = [
 		'maxMLD_ts_historical.nc',
-		# 'maxMLD_ts_forecast.nc'
+		'maxMLD_ts_forecast.nc'
 	]
+	# enseble = ['0101', '0151', '0201', '0251', '0301']
+	# runnum = enseble[0]
 	yr_range = [1950, 2100]
+	ensemble_mean = runnum == 'avg'
+	title = f'run number: {runnum}'
 
 	# Get a specific colormap, e.g., 'viridis'
 	cmap = cm.get_cmap('viridis')
@@ -110,9 +113,21 @@ def plot_mld_climo():
 
 	for f in files:
 		dat = xr.open_dataset(tsroot + f)
-		# if run in dat.runname:
-		# 	dat = dat.sel(runname=run)
-		dat = dat.mean(dim='runname')
+		if ensemble_mean:
+			dat = dat.mean(dim='runname')
+			title = 'ensemble mean'
+		else:
+			type = 'historical'
+			if 'forecast' in f:
+				type = 'ssp370_'
+			run = type + runnum
+
+			if run in dat.runname:
+				dat = dat.sel(runname=run)
+			else:
+				continue
+
+
 		years, months, d = dt64_y_m_d(dat.time.values)
 
 		mld = np.reshape(dat['maxMLD'].values, (-1, 12))
@@ -127,26 +142,30 @@ def plot_mld_climo():
 	ax.invert_yaxis()
 
 	plt.ylabel('Max MLD (m)')
-	plt.title(f'Labrador Sea Max MLD (historical avg)')
+	plt.title(f'Labrador Sea Max MLD ({title})')
 
 	# plot colorbar
 	plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax)
+
+	plt.savefig(f'figs/maxmld_climo_ts_{runnum}.png')
 	plt.show()
 
 
-def plot_mld_ts():
-	run = 'control'
+def plot_mld_ts(runnum):
+	# run = 'control'
 	# run = 'avg'
-	tsroot = '/global/cfs/cdirs/m1199/romina/data/'
+	tsroot = '/global/cfs/cdirs/m1199/romina/data/timeseries/'
 
-	# files = [
-	# 	'maxMLD_ts_historical.nc',
-	# 	'maxMLD_ts_forecast.nc'
-	# ]
-	# yr_range = [1950, 2100]
+	files = [
+		'maxMLD_ts_historical.nc',
+		'maxMLD_ts_forecast.nc'
+	]
+	yr_range = [1950, 2100]
+	ensemble_mean = runnum == 'avg'
+	title = f'run number: {runnum}'
 
-	files = ['maxMLD_ts_control.nc']
-	yr_range = [1, 2]
+	# files = ['maxMLD_ts_control.nc']
+	# yr_range = [1, 2]
 
 	# Get a specific colormap, e.g., 'viridis'
 	cmap = cm.get_cmap('viridis')
@@ -155,10 +174,19 @@ def plot_mld_ts():
 
 	for f in files:
 		dat = xr.open_dataset(tsroot + f)
-		if run in dat.runname:
-			dat = dat.sel(runname=run)
-		else:
+		if ensemble_mean:
 			dat = dat.mean(dim='runname')
+			title = 'ensemble mean'
+		else:
+			type = 'historical'
+			if 'forecast' in f:
+				type = 'ssp370_'
+			run = type + runnum
+
+			if run in dat.runname:
+				dat = dat.sel(runname=run)
+			else:
+				continue
 
 		mld_annual = np.reshape(dat['maxMLD'].values, (-1, 12))
 		mld_annual = np.max(mld_annual, axis=1)
@@ -172,12 +200,16 @@ def plot_mld_ts():
 
 	plt.xlabel('Date')
 	plt.ylabel('Max MLD (m)')
-	plt.title(f'Labrador Sea Annual Max MLD ({run})')
+	plt.title(f'Labrador Sea Annual Max MLD ({title})')
+
+	plt.xlim(yr_range[0], yr_range[-1])
+
 
 	ax = plt.gca()
 	ax.invert_yaxis()
+	plt.ylabel('Max MLD (m)')
 
-	plt.savefig('figs/maxmld_annual_ts_control.png')
+	plt.savefig(f'figs/maxmld_annual_ts_{runnum}.png')
 	plt.show()
 
 def plot_mld_vs_nao():
@@ -277,12 +309,15 @@ def plot_mld_vs_qnet():
 
 if __name__ == '__main__':
 	runnum = 'historical0201'
+	enseble = ['0101', '0151', '0201', '0251', '0301', 'avg']
+
 	# max_mld_percentile_ts(runnum)
 	# make_maxMLD_percentile_ts_dataset()
+	for i in enseble:
+		# plot_mld_climo(i)
+		plot_mld_ts(i)
 
-	# plot_mld_climo()
-	# plot_mld_ts()
 	# plot_mld_vs_nao()
-	plot_mld_vs_qnet()
+	# plot_mld_vs_qnet()
 
 
