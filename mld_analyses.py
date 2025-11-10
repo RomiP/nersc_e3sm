@@ -308,7 +308,6 @@ def plot_mld_vs_qnet():
 
 
 if __name__ == '__main__':
-	runnum = 'historical0201'
 	enseble = ['0101', '0151', '0201', '0251', '0301', 'avg']
 
 	# max_mld_percentile_ts(runnum)
