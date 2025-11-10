@@ -1,8 +1,3 @@
-from cftime import datetime	as cdt
-from helpers import MONTHS
-import matplotlib.cm as cm
-from matplotlib import colors
-import matplotlib.pyplot as plt
 import numpy as np
 import os
 from tqdm import tqdm
@@ -126,7 +121,7 @@ def get_control_singlevar_file(varname, component):
 
 def get_mpaso_file_by_date(year, month, runname, varname='timeSeriesStatsMonthly'):
 	'''
-	Open and return the netcdf file containing atmospheric data for the specified run number
+	Open and return the netcdf file containing ocean data for the specified run number
 	:param year: year [int]
 	:param month: month [int]
 	:param runname: run name [string], use 'control' for 400 yr control spin-up
@@ -135,6 +130,25 @@ def get_mpaso_file_by_date(year, month, runname, varname='timeSeriesStatsMonthly
 	'''
 	path, runname = get_e3sm_run_path(runname, 'ocn')
 	path += f'{runname}.mpaso.hist.am.{varname}.{year:04}-{month:02}-01.nc'
+
+	if not os.path.exists(path):
+		print(path, ' does not exist')
+		raise FileNotFoundError
+	else:
+		f = xr.open_dataset(path)
+		return f
+
+def get_mpassi_file_by_date(year, month, runname, varname='timeSeriesStatsMonthly'):
+	'''
+	Open and return the netcdf file containing sea ice data for the specified run number
+	:param year: year [int]
+	:param month: month [int]
+	:param runname: run name [string], use 'control' for 400 yr control spin-up
+	:param varname: output variable type str
+	:return: xarray dataset
+	'''
+	path, runname = get_e3sm_run_path(runname, 'ice')
+	path += f'{runname}.mpassi.hist.am.{varname}.{year:04}-{month:02}-01.nc'
 
 	if not os.path.exists(path):
 		print(path, ' does not exist')
@@ -172,9 +186,9 @@ def get_climatology(varname, month, runtype):
 	fname = '/global/cfs/cdirs/m1199/romina/data/climos/'
 	fname += f'{varname}_climo_m{month:02}_{runtype}.nc'
 
-	if os.path.exists(fname):
-		print('File exists. Returning it.')
-		return xr.open_dataset(fname)
+	# if os.path.exists(fname):
+	# 	print('File exists. Returning it.')
+	# 	return xr.open_dataset(fname)
 
 	runnames = ['control']
 	yearrange = range(1, 387)
@@ -192,30 +206,52 @@ def get_climatology(varname, month, runtype):
 		'filename':'timeSeriesStatsMonthlyMax',
 	}
 
+	ice_fields = {
+		'iceArea': 'timeMonthly_avg_iceAreaCell',
+		'filename': 'timeSeriesStatsMonthly',
+	}
+
+	atm_fields = {
+		'slp':'PSL',
+		'wind10':'U10',
+	}
+
 
 	ds = {}
 	for runname in runnames:
 		print(runname)
 		times_included = []
 		climodat = None
+
 		for year in tqdm(yearrange):
 			if varname in ocn_fields:
-
+				vname_long = ocn_fields[varname]
 				if runname == 'control' and varname == 'maxMLD':
 					fpath = (get_e3sm_run_path(runname, 'ocn')[0] +
 							 '../singleVarFiles/maxMLD/'
 							 f'dThreshMLD.E3SMv2.1B60to10rA02.mpaso.hist.am.timeSeriesStatsMonthlyMax.{year:04}-{month:02}-01.nc')
 					modeldat = xr.open_dataset(fpath)
 				else:
-					modeldat = get_mpaso_file_by_date(year, month, runnames[0], varname=ocn_fields['filename'])
+					modeldat = get_mpaso_file_by_date(year, month, runname, varname=ocn_fields['filename'])
 
-				if climodat is None:
-					climodat = modeldat[ocn_fields[varname]].rename(varname)
-					climodat['runname'] = runname
-				else:
-					climodat.data += modeldat[ocn_fields[varname]].values
+			elif varname in ice_fields:
+				vname_long = ice_fields[varname]
+				modeldat = get_mpassi_file_by_date(year, month, runname, varname=ice_fields['filename'])
 
-				times_included.append(modeldat.Time.values[0])
+			elif varname in ice_fields:
+				vname_long = atm_fields[varname]
+				modeldat = get_atmo_file_by_date(year, month, runname, varname=atm_fields['filename'])
+
+			if climodat is None:
+				# todo: squeeze Time dimension
+				climodat = modeldat[vname_long].rename(varname)
+				climodat['runname'] = runname
+			else:
+				climodat.data += modeldat[vname_long].values
+
+			times_included.append(modeldat.Time.values[0])
+
+
 
 		climodat.data /= len(times_included)
 
@@ -237,10 +273,10 @@ def get_climatology(varname, month, runtype):
 
 if __name__ == '__main__':
 	# get_arctic_ocn_region_mask('Labrador Sea')
-
+	# todo: might need to re-compute all climos. Check that all ensemble members are unique
 	for i in range(12):
 		print(i + 1)
-		get_climatology('maxMLD', i+1, 'control')
+		get_climatology('iceArea', i+1, 'historical')
 	# mpaso_mesh_latlon()
 
 	# f = xr.open_dataset('/global/cfs/cdirs/m1199/e3sm-arrm-simulations/E3SM-Arcticv2.1_historical0151/archive/ocn/hist/E3SM-Arcticv2.1_historical0151.mpaso.hist.am.timeSeriesStatsMonthlyMax.1960-01-01.nc')
