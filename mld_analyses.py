@@ -1,3 +1,5 @@
+import xarray
+
 from atmo_analyses import ts_seasonal_avg
 from cftime import datetime as cdt
 import datetime as dt
@@ -59,7 +61,6 @@ def max_mld_percentile_ts(runname, startdate, enddate):
 	# plt.show()
 
 	return dates, mld
-
 
 def make_maxMLD_percentile_ts_dataset():
 	# startdate = dt.datetime(1, 1, 1)
@@ -149,7 +150,6 @@ def plot_mld_climo(runnum):
 
 	plt.savefig(f'figs/maxmld_climo_ts_{runnum}.png')
 	plt.show()
-
 
 def plot_mld_ts(runnum):
 	# run = 'control'
@@ -259,7 +259,6 @@ def plot_mld_vs_nao():
 
 	plt.show()
 
-
 def plot_mld_vs_qnet():
 	type = 'historical'
 	run = 'avg'
@@ -306,15 +305,55 @@ def plot_mld_vs_qnet():
 
 	plt.show()
 
+def max_mld_heatmap():
+
+	type = 'historical'
+	mld_ts_file = f'/global/cfs/projectdirs/m1199/romina/data/timeseries/maxMLD_ts_{type}.nc'
+	mld_ts = xr.open_dataset(mld_ts_file)
+
+	mldvarname = 'timeMonthlyMax_max_dThreshMLD'
+
+	time = mld_ts['time'].values
+
+	ds = {}
+
+	for run in mld_ts.runname.values:
+		print(run)
+
+		mld_thresh_array = mld_ts.sel(runname=run)['maxMLD'].values
+		da = None
+		for i in tqdm(range(len(time))):
+			y, m, d = dt64_y_m_d(time[i])
+			mld_thresh = mld_thresh_array[i]
+			ocn_dat = get_mpaso_file_by_date(y, m, run, 'timeSeriesStatsMonthlyMax')[mldvarname]
+			if da is None:
+				da = ocn_dat > mld_thresh
+			else:
+				da = xr.concat([da, ocn_dat > mld_thresh], dim='Time')
+
+
+		da['runname'] = run
+		da.name = 'maxMLDmask'
+		ds[run] = da
+
+	da = xr.concat(ds.values(), dim='runname')
+	ds = xr.Dataset({'maxMLDmask': da})
+	ds.attrs['description'] = 'Mask showing where max MLD exceeds 95th percentile regionally defined in the Labrador Sea'
+	ds.to_netcdf(f'/global/cfs/projectdirs/m1199/romina/data/misc/maxMLDmask_{type}.nc')
+	return ds
 
 if __name__ == '__main__':
 	enseble = ['0101', '0151', '0201', '0251', '0301', 'avg']
 
 	# max_mld_percentile_ts(runnum)
 	# make_maxMLD_percentile_ts_dataset()
-	for i in enseble:
-		# plot_mld_climo(i)
-		plot_mld_ts(i)
+
+	max_mld_heatmap()
+
+	# for i in enseble:
+	# 	# plot_mld_climo(i)
+	# 	plot_mld_ts(i)
+	#
 
 	# plot_mld_vs_nao()
 	# plot_mld_vs_qnet()

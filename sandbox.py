@@ -306,6 +306,43 @@ def plot_qnet_data():
 	plt.show()
 
 
+def plot_heatmap(runnum):
+	runtype = 'historical'
+	maskfile = f'/global/cfs/projectdirs/m1199/romina/data/misc/maxMLDmask_{runtype}.nc'
+
+	mask = xr.open_dataset(maskfile)
+
+	if runnum == 'avg':
+		mask = mask.mean(dim='runname')
+	else:
+		mask = mask.sel(runname=runtype + runnum)
+
+	# climo for specific months
+	y, m, d = dt64_y_m_d(mask.Time.values)
+	idx = np.squeeze(np.argwhere((m <= 3) | (m >= 10)))
+	mask = mask.isel(Time=idx)
+
+	#  for full year climo
+	mask = mask.mean(dim='Time')
+
+	lat, lon, cellnum = mpaso_mesh_latlon()
+
+	fig, ax = unstructured_pcolor(lat, lon, mask['maxMLDmask'].values,
+								  extent=[-70, -30, 50, 70],
+								  # clim=[-300, 100],
+								  # cmap='coolwarm',
+								  # norm=0,
+								  clabel='max MLD location frequency',
+								  # extenttype='tight',
+								  gridlines=True,
+								  # interp='mosaic',
+								  title=runtype + runnum + ' Oct-Mar',
+								  )
+
+	# plt.savefig(f'figs/qnet_climo_oct-mar_{runtype}{runnum}.png')
+	plt.show()
+
+
 if __name__ == '__main__':
 	# supported values are ['gtk3agg', 'gtk3cairo', 'gtk4agg', 'gtk4cairo', 'macosx', 'nbagg', 'notebook', 'qtagg',
 	# 'qtcairo', 'qt5agg', 'qt5cairo', 'tkagg', 'tkcairo', 'webagg', 'wx', 'wxagg', 'wxcairo', 'agg', 'cairo', 'pdf',
@@ -321,7 +358,8 @@ if __name__ == '__main__':
 	# open_some_data()
 	# plot_atm_data()
 	for run in ['0101', '0151', '0201', '0251', '0301', 'avg']:
-		plot_climo(run)
+		# plot_climo(run)
+		plot_heatmap(run)
 # plot_qnet_data()
 
 # path = '/global/cfs/projectdirs/m1199/e3sm-arrm-simulations/TL319_r05_ARRM10to60E2r1.JRA-MOSART-Phys/archive/ocn/hist/'
