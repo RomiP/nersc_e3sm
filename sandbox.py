@@ -13,6 +13,7 @@ from plot_unstructured import *
 
 colorIndices = [0, 14, 28, 57, 85, 113, 125, 142, 155, 170, 198, 227, 242, 255]
 
+
 def open_some_data():
 	# Settings for nersc
 	meshName = 'ARRM10to60E2r1'
@@ -22,7 +23,6 @@ def open_some_data():
 	modeldir = f'/global/cfs/cdirs/m1199/e3sm-arrm-simulations/{runname}/archive'
 	regionMaskDir = '/global/cfs/cdirs/m1199/milena/mpas-region_masks/'
 	isShortTermArchive = True
-
 
 	year = 1960
 	month = 1
@@ -47,23 +47,23 @@ def open_some_data():
 	# 			 'clevelsSH': [-1.8, -1.6, -1.0, -0.5, 0.0, 0.5, 2.0, 4.0, 6.0, 8.0, 12.],
 	# 			 'is3d': False},
 	# ]
-	dlevels = [0., 50.] # depth levels
+	dlevels = [0., 50.]  # depth levels
 
 	mpasFile = 'timeSeriesStatsMonthlyMax'
 	mpasFileDayformat = '01'
 	timeIndex = 0
 	variables = [
-	            {'name': 'maxMLD',
-	             'mpasvarname': 'timeMonthlyMax_max_dThreshMLD',
-	             'title': 'Maximum MLD',
-	             'units': 'm',
-	             'factor': 1,
-	             'colormap': plt.get_cmap('viridis'),
-	             'clevels': [10., 50., 80., 100., 150., 200., 300., 400., 800., 1200., 2000.],
-	             'clevelsNH': [50., 100., 150., 200., 300., 500., 800., 1200., 1500., 2000., 3000.],
-	             'clevelsSH': [10., 50., 80., 100., 150., 200., 300., 400., 800., 1200., 2000.],
-	             'is3d': False}
-	           ]
+		{'name': 'maxMLD',
+		 'mpasvarname': 'timeMonthlyMax_max_dThreshMLD',
+		 'title': 'Maximum MLD',
+		 'units': 'm',
+		 'factor': 1,
+		 'colormap': plt.get_cmap('viridis'),
+		 'clevels': [10., 50., 80., 100., 150., 200., 300., 400., 800., 1200., 2000.],
+		 'clevelsNH': [50., 100., 150., 200., 300., 500., 800., 1200., 1500., 2000., 3000.],
+		 'clevelsSH': [10., 50., 80., 100., 150., 200., 300., 400., 800., 1200., 2000.],
+		 'is3d': False}
+	]
 
 	# Info about MPAS mesh
 	dsMesh = xr.open_dataset(meshfile)
@@ -158,7 +158,6 @@ def open_some_data():
 	plt.show()
 
 
-
 def plot_regional_avg_max_mld():
 	months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 	ystart = 1950
@@ -190,7 +189,6 @@ def plot_regional_avg_max_mld():
 
 
 def plot_atm_data():
-
 	y = 1960
 	m = 1
 	runname = 'historical0101'
@@ -224,28 +222,51 @@ def playing_with_plotly():
 
 	fig.show()
 
-def plot_climo():
+
+def plot_climo(runnum='avg'):
 	runtype = 'historical'
-	runnum = '0101'
-	varname	= 'maxMLD'
-	month =  1
-	climo = get_climatology(varname, month, runtype)
-	lat, lon, cellnum = mpaso_mesh_latlon()
+	varname = 'slp'
+	month = [1,2,3]
+	if isinstance(month, int):
+		climo = get_climatology(varname, month, runtype)
+		mstr = f'm{month:02}'
+	else:
+		climo = get_climatology(varname, month[0], runtype)
+		for m in month[1:]:
+			climo[varname].data += get_climatology(varname, m, runtype)[varname].data
+
+		climo[varname].data /= len(month)
+		mstr = f'{MONTHS[month[0]-1]}-{MONTHS[month[-1]-1]}'
+
+
+	if varname in ['slp']:
+		lat = climo['lat'].data
+		lon = climo['lon'].data
+		lon[lon>180] -= 360
+	else:
+		lat, lon, cellnum = mpaso_mesh_latlon()
 	# file = '/global/cfs/projectdirs/m1199/romina/data/maxMLD_climo_m01_historical.nc'
 	# climo = xr.open_dataset(file)
 
 	if runnum == 'avg':
 		climo = climo.mean(dim='runname')
 	else:
-		climo = climo.sel(runname=runtype+runnum)
+		climo = climo.sel(runname=runtype + runnum)
 
-	fig, ax = unstructured_pcolor(lat, lon, climo['maxMLD'].values,
-								 extent=[-70, -30, 50, 70],
-								 # extenttype='tight',
-								 gridlines=True,
-								 interp=False)
-	plt.title(f'{varname} Climatology month{month:02} run{runtype+runnum}')
+	fig, ax = unstructured_pcolor(lat, lon, climo[varname].values,
+								  # extent=[-70, -30, 50, 70],
+								  extent=[-70, 10, 30, 70],
+								  extenttype='tight',
+								  cmap='viridis',
+								  clim=[99500, 102500],
+								  # dotsize=5,
+								  gridlines=True,
+								  interp='grid')
+	plt.title(f'{varname} Climatology {mstr} {runtype + runnum}')
+
+	plt.savefig(f'figs/{varname}_climo_{mstr.lower()}_{runtype+runnum}.png')
 	plt.show()
+
 
 def plot_qnet_data():
 	runtype = 'historical'
@@ -256,10 +277,7 @@ def plot_qnet_data():
 	if runnum == 'avg':
 		qnetds = qnetds.mean(dim='runname')
 	else:
-		qnetds = qnetds.sel(runname=runtype+runnum)
-
-
-
+		qnetds = qnetds.sel(runname=runtype + runnum)
 
 	# climo for specific months
 	y, m, d = dt64_y_m_d(qnetds.Time.values)
@@ -288,9 +306,7 @@ def plot_qnet_data():
 	plt.show()
 
 
-
 if __name__ == '__main__':
-
 	# supported values are ['gtk3agg', 'gtk3cairo', 'gtk4agg', 'gtk4cairo', 'macosx', 'nbagg', 'notebook', 'qtagg',
 	# 'qtcairo', 'qt5agg', 'qt5cairo', 'tkagg', 'tkcairo', 'webagg', 'wx', 'wxagg', 'wxcairo', 'agg', 'cairo', 'pdf',
 	# 'pgf', 'ps', 'svg', 'template', 'module://backend_interagg', 'inline']
@@ -304,9 +320,10 @@ if __name__ == '__main__':
 	# unstructured_pcolor(0,0,0)
 	# open_some_data()
 	# plot_atm_data()
-	# plot_climo()
-	plot_qnet_data()
+	for run in ['0101', '0151', '0201', '0251', '0301', 'avg']:
+		plot_climo(run)
+# plot_qnet_data()
 
-	# path = '/global/cfs/projectdirs/m1199/e3sm-arrm-simulations/TL319_r05_ARRM10to60E2r1.JRA-MOSART-Phys/archive/ocn/hist/'
-	# fname = 'TL319_r05_ARRM10to60E2r1.JRA-MOSART-Phys.mpaso.hist.am.eddyProductVariables.1991-01-01.nc'
-	# dat = xr.open_dataset(path + fname)
+# path = '/global/cfs/projectdirs/m1199/e3sm-arrm-simulations/TL319_r05_ARRM10to60E2r1.JRA-MOSART-Phys/archive/ocn/hist/'
+# fname = 'TL319_r05_ARRM10to60E2r1.JRA-MOSART-Phys.mpaso.hist.am.eddyProductVariables.1991-01-01.nc'
+# dat = xr.open_dataset(path + fname)
