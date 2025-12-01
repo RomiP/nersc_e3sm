@@ -53,21 +53,25 @@ def make_qnet_field(startdate, enddate, runs, type):
 	ds.to_netcdf(f'/global/cfs/cdirs/m1199/romina/data/netHeatFlux_{type}.nc')
 
 def extract_ts_from_composite_file():
-	type = 'forecast'
+	type = 'historical'
 	dat_file = f'/global/cfs/cdirs/m1199/romina/data/composite_fields/netHeatFlux_{type}.nc'
-	geopoly_file = 'regional_masks/LabSea_DCzone.geojson'
 
-	with open(geopoly_file, 'r') as f:
-		geopoly = f.read()
-	lat, lon, ncells = mpaso_mesh_latlon()
-	mask = geopolygon_mask(geopoly, lon, lat)
+	dc_mask = xr.open_dataset(f'/global/cfs/projectdirs/m1199/romina/data/misc/maxMLDmask_{type}.nc')
+	mask = dc_mask['maxMLDmask']
 
-	ncells *= mask
+	# geopoly_file = 'regional_masks/LabSea_DCzone.geojson'
+	# with open(geopoly_file, 'r') as f:
+	# 	geopoly = f.read()
+	# lat, lon, ncells = mpaso_mesh_latlon()
+	# mask = geopolygon_mask(geopoly, lon, lat)
+
+	# ncells *= mask
 	dat = xr.open_dataset(dat_file)
 	print('masking')
-	dat = dat.where(dat.nCells * mask, drop=False).mean(dim='nCells')
+	# dat = dat.where(dat.nCells * mask, drop=False).mean(dim='nCells')
+	dat = dat.where(mask, drop=False).mean(dim='nCells')
 
-	dat.to_netcdf(f'/global/cfs/projectdirs/m1199/romina/data/timeseries/netHeatFlux_{type}.nc')
+	dat.to_netcdf(f'/global/cfs/projectdirs/m1199/romina/data/timeseries/netHeatFlux_LabSeaDC_{type}.nc')
 
 
 if __name__ == '__main__':
@@ -78,15 +82,15 @@ if __name__ == '__main__':
 	# type = 'control'
 	# runs = ['control']
 
-	# startdate = dt.datetime(1950, 1, 1)
-	# enddate = dt.datetime(2015, 1, 1)
-	# type = 'historical'
-	# runs = ['historical0101', 'historical0151', 'historical0201', 'historical0251', 'historical0301']
+	startdate = dt.datetime(1950, 1, 1)
+	enddate = dt.datetime(2015, 1, 1)
+	type = 'historical'
+	runs = ['historical0101', 'historical0151', 'historical0201', 'historical0251', 'historical0301']
 
-	startdate = dt.datetime(2015, 1, 1)
-	enddate = dt.datetime(2097, 1, 1)
-	type = 'forecast'
-	runs = ['ssp370_0101', 'ssp370_0201']
+	# startdate = dt.datetime(2015, 1, 1)
+	# enddate = dt.datetime(2097, 1, 1)
+	# type = 'forecast'
+	# runs = ['ssp370_0101', 'ssp370_0201']
 
 	# %% Do stuff
 

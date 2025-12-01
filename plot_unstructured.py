@@ -3,6 +3,7 @@ import cartopy
 import cartopy.crs as ccrs
 import cartopy.mpl.ticker as ctk
 import holoviews as hv
+import matplotlib
 import matplotlib.colors as cm
 from matplotlib.colors import TwoSlopeNorm, ListedColormap
 from matplotlib.ticker import FixedLocator
@@ -14,6 +15,7 @@ from open_e3sm_files import MESHFILE_OCN
 from scipy.interpolate import griddata
 import xarray as xr
 
+matplotlib.use('module://backend_interagg')
 
 class MidpointNormalize(cm.Normalize):
 	def __init__(self, vmin=None, vmax=None, midpoint=None, clip=False):
@@ -45,8 +47,6 @@ def _init_proj(proj_name, **kwargs):
 		projection = ccrs.Robinson()
 
 	return projection
-
-
 
 
 def unstructured_pcolor(lat, lon, dat, **kwargs):

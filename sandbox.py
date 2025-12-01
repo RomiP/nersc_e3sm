@@ -223,50 +223,6 @@ def playing_with_plotly():
 	fig.show()
 
 
-def plot_climo(runnum='avg'):
-	runtype = 'historical'
-	varname = 'slp'
-	month = [1,2,3]
-	if isinstance(month, int):
-		climo = get_climatology(varname, month, runtype)
-		mstr = f'm{month:02}'
-	else:
-		climo = get_climatology(varname, month[0], runtype)
-		for m in month[1:]:
-			climo[varname].data += get_climatology(varname, m, runtype)[varname].data
-
-		climo[varname].data /= len(month)
-		mstr = f'{MONTHS[month[0]-1]}-{MONTHS[month[-1]-1]}'
-
-
-	if varname in ['slp']:
-		lat = climo['lat'].data
-		lon = climo['lon'].data
-		lon[lon>180] -= 360
-	else:
-		lat, lon, cellnum = mpaso_mesh_latlon()
-	# file = '/global/cfs/projectdirs/m1199/romina/data/maxMLD_climo_m01_historical.nc'
-	# climo = xr.open_dataset(file)
-
-	if runnum == 'avg':
-		climo = climo.mean(dim='runname')
-	else:
-		climo = climo.sel(runname=runtype + runnum)
-
-	fig, ax = unstructured_pcolor(lat, lon, climo[varname].values,
-								  # extent=[-70, -30, 50, 70],
-								  extent=[-70, 10, 30, 70],
-								  extenttype='tight',
-								  cmap='viridis',
-								  clim=[99500, 102500],
-								  # dotsize=5,
-								  gridlines=True,
-								  interp='grid')
-	plt.title(f'{varname} Climatology {mstr} {runtype + runnum}')
-
-	plt.savefig(f'figs/{varname}_climo_{mstr.lower()}_{runtype+runnum}.png')
-	plt.show()
-
 
 def plot_qnet_data():
 	runtype = 'historical'
@@ -348,20 +304,16 @@ if __name__ == '__main__':
 	# 'qtcairo', 'qt5agg', 'qt5cairo', 'tkagg', 'tkcairo', 'webagg', 'wx', 'wxagg', 'wxcairo', 'agg', 'cairo', 'pdf',
 	# 'pgf', 'ps', 'svg', 'template', 'module://backend_interagg', 'inline']
 	matplotlib.use('module://backend_interagg')
-	print(matplotlib.get_backend())
-
-	# x = np.array([1,2,3,4,5,6,7,8,9])
-	# plt.plot(x,x)
-	# plt.show()
+	# print(matplotlib.get_backend())
 
 	# unstructured_pcolor(0,0,0)
 	# open_some_data()
 	# plot_atm_data()
 	for run in ['0101', '0151', '0201', '0251', '0301', 'avg']:
-		# plot_climo(run)
 		plot_heatmap(run)
-# plot_qnet_data()
 
-# path = '/global/cfs/projectdirs/m1199/e3sm-arrm-simulations/TL319_r05_ARRM10to60E2r1.JRA-MOSART-Phys/archive/ocn/hist/'
-# fname = 'TL319_r05_ARRM10to60E2r1.JRA-MOSART-Phys.mpaso.hist.am.eddyProductVariables.1991-01-01.nc'
-# dat = xr.open_dataset(path + fname)
+	# plot_qnet_data()
+
+	# path = '/global/cfs/projectdirs/m1199/e3sm-arrm-simulations/TL319_r05_ARRM10to60E2r1.JRA-MOSART-Phys/archive/ocn/hist/'
+	# fname = 'TL319_r05_ARRM10to60E2r1.JRA-MOSART-Phys.mpaso.hist.am.eddyProductVariables.1991-01-01.nc'
+	# dat = xr.open_dataset(path + fname)

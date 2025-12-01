@@ -5,6 +5,9 @@ from cftime import datetime as cdt
 import datetime as dt
 from helpers import *
 import matplotlib
+
+from plot_unstructured import unstructured_pcolor
+
 matplotlib.use('module://backend_interagg')
 import matplotlib.pyplot as plt
 import numpy as np
@@ -259,14 +262,14 @@ def plot_mld_vs_nao():
 
 	plt.show()
 
-def plot_mld_vs_qnet():
-	type = 'historical'
-	run = 'avg'
+def plot_mld_vs_qnet(run, type):
+	# type = 'historical'
+	# run = 'avg'
 	monthrange = [10, 3]
 
 	root = '/global/cfs/cdirs/m1199/romina/data/timeseries/'
 	mldfile = f'maxMLD_ts_{type}.nc'
-	qnetfile = f'netHeatFlux_{type}.nc'
+	qnetfile = f'netHeatFlux_LabSeaDC_{type}.nc'
 
 	mlddata = xr.open_dataset(root + mldfile)
 	qnetdata = xr.open_dataset(root + qnetfile)
@@ -342,18 +345,42 @@ def max_mld_heatmap():
 	ds.to_netcdf(f'/global/cfs/projectdirs/m1199/romina/data/misc/maxMLDmask_{type}.nc')
 	return ds
 
+def plot_heatmap():
+	type = 'historical'
+	run = '0101'
+	hm_dat = xr.open_dataset(f'/global/cfs/projectdirs/m1199/romina/data/misc/maxMLDmask_{type}.nc')
+
+	n = len(hm_dat.Time)
+	print(n)
+
+	if run == 'avg':
+		n *= len(hm_dat.runname)
+		hm_dat = hm_dat.sum('runname')
+	else:
+		hm_dat = hm_dat.sel(runname=type + run)
+	hm_dat = hm_dat.sum(dim='Time')
+	hm_dat = hm_dat['maxMLDmask'].values / n
+
+	lat, lon, ncells = mpaso_mesh_latlon()
+
+	fig = unstructured_pcolor(lat, lon, hm_dat)
+	plt.show()
+
+
+
 if __name__ == '__main__':
 	enseble = ['0101', '0151', '0201', '0251', '0301', 'avg']
 
 	# max_mld_percentile_ts(runnum)
 	# make_maxMLD_percentile_ts_dataset()
 
-	max_mld_heatmap()
+	# max_mld_heatmap()
+	plot_heatmap()
 
 	# for i in enseble:
-	# 	# plot_mld_climo(i)
-	# 	plot_mld_ts(i)
-	#
+	# # 	plot_mld_climo(i)
+	# # 	plot_mld_ts(i)
+	# 	plot_mld_vs_qnet(i, 'historical')
 
 	# plot_mld_vs_nao()
 	# plot_mld_vs_qnet()

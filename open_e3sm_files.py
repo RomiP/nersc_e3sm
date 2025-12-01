@@ -186,7 +186,7 @@ def get_climatology(varname, month, runtype, overwrite=False):
 	fname += f'{varname}_climo_m{month:02}_{runtype}.nc'
 
 	if os.path.exists(fname) and not overwrite:
-		print('File exists. Returning it.')
+		print(f'File exists. Returning {fname}.')
 		return xr.open_dataset(fname)
 
 	runnames = ['control']
