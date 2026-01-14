@@ -85,6 +85,15 @@ def mpaso_mesh_latlon():
 	lonCell[lonCell > 180] -= 360
 	return latCell, lonCell, mesh.nCells.values
 
+def mpaso_depth():
+	mesh = xr.open_dataset(MESHFILE_OCN).sel(Time=0)
+	layer = mesh.layerThickness
+	dz = layer.where(layer > 0).mean(dim='nCells', skipna=True).values
+	return np.cumsum(dz)
+
+
+
+
 def max_mld_ts_dir(runnum='0151'):
 	return f'/global/cfs/cdirs/m1199/e3sm-arrm-simulations/E3SM-Arcticv2.1_historical{runnum}/timeseries_data/maxMLD/'
 

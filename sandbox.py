@@ -254,7 +254,7 @@ def plot_qnet_data():
 								  clabel='Net Heat Flux ($W/m^2$)',
 								  # extenttype='tight',
 								  gridlines=True,
-								  interp='mosaic',
+								  # interp='mosaic',
 								  title=runtype + runnum + ' Oct-Mar',
 								  )
 
@@ -298,6 +298,38 @@ def plot_heatmap(runnum):
 	# plt.savefig(f'figs/qnet_climo_oct-mar_{runtype}{runnum}.png')
 	plt.show()
 
+def plot_field_by_date(date, field, runnum, plotargs={}):
+	runtype = 'historical'
+	filemap = {'composites': ['qnet'],
+			   'atm':[],
+			   'ocn':[]}
+
+	if field in filemap['composites']:
+		if field == 'qnet':
+			field = 'netHeatFlux'
+			qnet_file = f'/global/cfs/cdirs/m1199/romina/data/composite_fields/netHeatFlux_{runtype}.nc'
+			dat = xr.open_dataset(qnet_file)
+			lat, lon, cellnum = mpaso_mesh_latlon()
+	elif field in filemap['atm']:
+		dat = get_atmo_file_by_date(date.year, date.month, runtype+runnum)
+	elif field in filemap['ocn']:
+		date = get_mpaso_file_by_date(date.year, date.month, runtype+runnum)
+		lat, lon, cellnum = mpaso_mesh_latlon()
+
+	if runnum == 'avg':
+		dat = dat.mean(dim='runname')
+	else:
+		dat = dat.sel(runname=runtype + runnum)
+
+	# climo for specific months
+	y, m, d = dt64_y_m_d(dat.Time.values)
+
+	dat = dat.isel(Time=(y==date.year) & (m==date.month))
+
+	fig, ax = unstructured_pcolor(lat, lon, dat[field].values, **plotargs)
+
+	return fig, ax
+
 
 if __name__ == '__main__':
 	# supported values are ['gtk3agg', 'gtk3cairo', 'gtk4agg', 'gtk4cairo', 'macosx', 'nbagg', 'notebook', 'qtagg',
@@ -309,10 +341,35 @@ if __name__ == '__main__':
 	# unstructured_pcolor(0,0,0)
 	# open_some_data()
 	# plot_atm_data()
-	for run in ['0101', '0151', '0201', '0251', '0301', 'avg']:
-		plot_heatmap(run)
+	# for run in ['0101', '0151', '0201', '0251', '0301', 'avg']:
+	# 	plot_heatmap(run)
 
 	# plot_qnet_data()
+
+	# %% Make some one-off plots of qnet for weird convection years
+
+	plotargs = dict(
+		projname='Miller',
+		extent=[-70, -30, 50, 70],
+		clim=[-400, 100],
+		cmap='coolwarm',
+		norm=0,
+		clabel='Net Heat Flux ($W/m^2$)',
+		# extenttype='tight',
+		gridlines=True,
+		title=' Oct-Mar',
+	)
+	for month in [1,2,3,4]:
+		date = dt.datetime(1978, month, 1)
+		plotargs['title'] = date.strftime('%b %Y')
+		plot_field_by_date(date,
+						   'qnet',
+						   '0101', plotargs=plotargs)
+
+		plt.savefig(f'figs/qnet_byMonth/qnet_{date.strftime("%Y_%m")}.png')
+		plt.show()
+
+
 
 	# path = '/global/cfs/projectdirs/m1199/e3sm-arrm-simulations/TL319_r05_ARRM10to60E2r1.JRA-MOSART-Phys/archive/ocn/hist/'
 	# fname = 'TL319_r05_ARRM10to60E2r1.JRA-MOSART-Phys.mpaso.hist.am.eddyProductVariables.1991-01-01.nc'

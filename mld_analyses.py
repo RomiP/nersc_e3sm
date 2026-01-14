@@ -265,7 +265,8 @@ def plot_mld_vs_nao():
 def plot_mld_vs_qnet(run, type):
 	# type = 'historical'
 	# run = 'avg'
-	monthrange = [10, 3]
+	# monthrange = [10, 3]
+	monthrange = [1, 4]
 
 	root = '/global/cfs/cdirs/m1199/romina/data/timeseries/'
 	mldfile = f'maxMLD_ts_{type}.nc'
@@ -288,23 +289,38 @@ def plot_mld_vs_qnet(run, type):
 	qnet, years = ts_seasonal_avg(qnet, qnetdata.Time.values, monthrange)
 
 	mld = mld.reshape(-1, 12)
-	mld = np.max(mld, axis=1)[:-1]
+	mld = np.max(mld, axis=1)
+	if monthrange[1]<monthrange[0]:
+		mld = mld[:-1]
 
 	plt.scatter(qnet, mld)
 	plt.xlabel('Net Heat Flux ($W/m^2$)')
 	plt.ylabel('Max MLD (m)')
-	plt.title(f'E3SM Mean Winter Q_net Effect on Max MLD ({type + run})')
+	plt.title(f'E3SM Mean Q_net Effect on Max MLD ({type + run})\nmonths: {monthrange[0]}-{monthrange[1]}')
 
 	plt.xlim(-325, -50)
+
+	i = mld < 600
+	print('mld < 600 m')
+	print(years[i])
+	print(mld[i])
+	print(qnet[i])
+
+	i = qnet > -160
+	print('qnet > -160 m')
+	print(years[i])
+	print(mld[i])
+	print(qnet[i])
+
 
 	corr = np.corrcoef(mld, qnet)[0, 1]
 	r2 = round(corr ** 2, 4)
 	print(corr)
 
 	ax = plt.gca()
-	plt.text(.05, 0.05, f'$R^2$ = {r2}', ha='left', va='bottom', transform=ax.transAxes)
-	# ax.invert_yaxis()
-	plt.savefig(f'figs/qnet_vs_maxMLD_{type + run}.png')
+	plt.text(.05, 0.95, f'$R^2$ = {r2}', ha='left', va='top', transform=ax.transAxes)
+	ax.invert_yaxis()
+	plt.savefig(f'figs/qnet_vs_maxMLD_{type + run}_m{monthrange[0]:02}-{monthrange[1]:02}.png')
 
 	plt.show()
 
@@ -366,21 +382,45 @@ def plot_heatmap():
 	fig = unstructured_pcolor(lat, lon, hm_dat)
 	plt.show()
 
+def mean_N2_with_depth(depth_range, dates, runnum, regional_mask=None):
+
+	# dat = get_mpaso_file_by_date(date.year, date.month, 'historical0101')
+	z = mpaso_depth()
+	iz1 = np.argmin(abs(z-depth_range[0]))
+	iz2 = np.argmin(abs(z-depth_range[1]))
+
+	n2 = []
+	for i in tqdm(range(len(dates))):
+		n2_dat = get_mpaso_file_by_date(dates[i].year, dates[i].month, runnum)['timeMonthly_avg_BruntVaisalaFreqTop']
+		x = n2_dat.isel(nVertLevels=slice(iz1, iz2))
+		x = x.mean(dim=['Time', 'nVertLevels'])
+		if regional_mask is not None:
+			x = x.where(regional_mask).mean(dim='nCells').values
+		n2.append(x)
+
+	plt.plot(dates, n2)
+	plt.show()
+	return n2
 
 
 if __name__ == '__main__':
 	enseble = ['0101', '0151', '0201', '0251', '0301', 'avg']
+	dates = make_monthly_date_list(dt.datetime(1950, 1, 1),
+								   dt.datetime(2015, 1, 1))
+	mask = get_arctic_ocn_region_mask('Labrador Sea')
 
 	# max_mld_percentile_ts(runnum)
 	# make_maxMLD_percentile_ts_dataset()
 
 	# max_mld_heatmap()
-	plot_heatmap()
+	# plot_heatmap()
 
-	# for i in enseble:
-	# # 	plot_mld_climo(i)
-	# # 	plot_mld_ts(i)
-	# 	plot_mld_vs_qnet(i, 'historical')
+	for i in enseble[:]:
+		print(i)
+	# 	plot_mld_climo(i)
+	# 	plot_mld_ts(i)
+		plot_mld_vs_qnet(i, 'historical')
+		# mean_N2_with_depth([0, 1000], dates, 'historical' + i, mask)
 
 	# plot_mld_vs_nao()
 	# plot_mld_vs_qnet()

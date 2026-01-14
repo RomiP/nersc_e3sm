@@ -2,14 +2,19 @@ import datetime as dt
 from dateutil.relativedelta import relativedelta
 import geopandas as gpd
 import json
+import matplotlib.pyplot as plt
 import numpy as np
 import shapely
+from shapely.geometry import Polygon, LineString
+from shapely.ops import unary_union, polygonize
 from typing import Union
+import xarray as xr
+
 
 MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 
-def rotate(l:Union[list, np.array], k:int) -> Union[list, np.array]:
+def rotate(l: Union[list, np.array], k: int) -> Union[list, np.array]:
 	'''
 	Rotate list or array k steps to the left
 	:param l: list or array
@@ -63,7 +68,7 @@ def normalize(x: np.ndarray) -> np.ndarray:
 	return norm
 
 
-def make_monthly_date_list(startdate:dt.datetime, enddate:dt.datetime) -> list[dt.datetime]:
+def make_monthly_date_list(startdate: dt.datetime, enddate: dt.datetime) -> list[dt.datetime]:
 	dates = []
 	while startdate < enddate:
 		dates.append(startdate)
@@ -71,7 +76,7 @@ def make_monthly_date_list(startdate:dt.datetime, enddate:dt.datetime) -> list[d
 	return dates
 
 
-def geopolygon_mask(geojson_polygon: str, lons: np.ndarray, lats:np.ndarray) -> np.ndarray:
+def geopolygon_mask(geojson_polygon: str, lons: np.ndarray, lats: np.ndarray) -> np.ndarray:
 	"""
 	Determine whether each point in a 2D array of [longitude, latitude] coordinates
 	lies inside a GeoJSON polygon using Shapely's vectorized API.
@@ -123,9 +128,75 @@ def geopolygon_mask(geojson_polygon: str, lons: np.ndarray, lats:np.ndarray) -> 
 	# Create Shapely points from coordinates
 	points = shapely.points(lons, lats)
 
-
 	# Check containment
 	return shapely.contains(polygon, points)
 
 
+def make_geopoly_from_bath(bath, depth):
+	crs = "EPSG:4326"
+	fig, ax = plt.subplots()
+	# One isobath level. If your dataset uses positive depths, set isobath_value accordingly.
+	CS = ax.contour(bath.lon.values, bath.lat.values, bath.elevation.values, levels=[-depth])
 
+	plt.close(fig)  # no need to render
+
+	polygons = []
+
+	# Convert contour paths to polygons (only closed rings)
+
+	# Convert contour paths to segments
+	segments = []
+	for col in CS.collections:
+		for path in col.get_paths():
+			v = path.vertices  # Nx2 array of [lon, lat]
+			# Remove NaNs and duplicates
+			v = v[~np.isnan(v).any(axis=1)]
+			if len(v) < 2:
+				continue
+
+			# If the path is closed, Matplotlib usually repeats the first point at the end.
+			# We'll just create segments for consecutive pairs.
+			for i in range(len(v) - 1):
+				p1 = tuple(v[i])
+				p2 = tuple(v[i + 1])
+				if p1 != p2:
+					segments.append(LineString([p1, p2]))
+
+	if not segments:
+		# Nothing extracted at this level
+		return gpd.GeoDataFrame({"level": []}, geometry=[], crs=crs)
+
+	# Merge and polygonize the segment network
+	merged = unary_union(segments)
+	polys = list(polygonize(merged))
+
+	# Filter degenerate/super small polygons
+	valid_polys = []
+	for poly in polys:
+		# reject invalid or empty
+		if (poly is None) or poly.is_empty or (not poly.is_valid):
+			continue
+		# reject rings with too few vertices (outer boundary check)
+		min_vertices = 3
+		if hasattr(poly, "exterior") and len(poly.exterior.coords) < min_vertices:
+			continue
+		valid_polys.append(poly)
+
+	if not valid_polys:
+		return gpd.GeoDataFrame({"level": []}, geometry=[], crs=crs)
+
+	gdf = gpd.GeoDataFrame({"level": [depth] * len(valid_polys)}, geometry=valid_polys, crs=crs)
+
+	# Optional simplification (careful: can alter topology)
+	simplify_tolerance = 10
+	if simplify_tolerance and simplify_tolerance > 0:
+		gdf["geometry"] = gdf.geometry.simplify(simplify_tolerance, preserve_topology=True)
+
+		return gdf
+
+
+if __name__ == '__main__':
+
+	maskgeojson = 'regional_masks/LabSeaWhole.geojson'
+	lat, lon, ncells
+	geopolygon_mask()

@@ -56,14 +56,14 @@ def extract_ts_from_composite_file():
 	type = 'historical'
 	dat_file = f'/global/cfs/cdirs/m1199/romina/data/composite_fields/netHeatFlux_{type}.nc'
 
-	dc_mask = xr.open_dataset(f'/global/cfs/projectdirs/m1199/romina/data/misc/maxMLDmask_{type}.nc')
-	mask = dc_mask['maxMLDmask']
+	# dc_mask = xr.open_dataset(f'/global/cfs/projectdirs/m1199/romina/data/misc/maxMLDmask_{type}.nc')
+	# mask = dc_mask['maxMLDmask']
 
-	# geopoly_file = 'regional_masks/LabSea_DCzone.geojson'
-	# with open(geopoly_file, 'r') as f:
-	# 	geopoly = f.read()
-	# lat, lon, ncells = mpaso_mesh_latlon()
-	# mask = geopolygon_mask(geopoly, lon, lat)
+	geopoly_file = 'regional_masks/LabSea_whole.geojson'
+	with open(geopoly_file, 'r') as f:
+		geopoly = f.read()
+	lat, lon, ncells = mpaso_mesh_latlon()
+	mask = geopolygon_mask(geopoly, lon, lat)
 
 	# ncells *= mask
 	dat = xr.open_dataset(dat_file)
@@ -71,7 +71,7 @@ def extract_ts_from_composite_file():
 	# dat = dat.where(dat.nCells * mask, drop=False).mean(dim='nCells')
 	dat = dat.where(mask, drop=False).mean(dim='nCells')
 
-	dat.to_netcdf(f'/global/cfs/projectdirs/m1199/romina/data/timeseries/netHeatFlux_LabSeaDC_{type}.nc')
+	dat.to_netcdf(f'/global/cfs/projectdirs/m1199/romina/data/timeseries/netHeatFlux_LabSeaWhole_{type}.nc')
 
 
 if __name__ == '__main__':
