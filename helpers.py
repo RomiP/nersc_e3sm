@@ -13,6 +13,15 @@ import xarray as xr
 
 MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
+VARNAMES = {
+	'maxMLD':'timeMonthlyMax_max_dThreshMLD',
+	'bvfml':'timeMonthly_avg_bruntVaisalaFreqML',
+	'qlat':'timeMonthly_avg_latentHeatFlux',
+	'lwhfd':'timeMonthly_avg_longWaveHeatFluxDown',
+	'lwhfu':'timeMonthly_avg_longWaveHeatFluxUp',
+	'swhf':'timeMonthly_avg_shortWaveHeatFlux',
+	'qsens':'timeMonthly_avg_sensibleHeatFlux',
+}
 
 def rotate(l: Union[list, np.array], k: int) -> Union[list, np.array]:
 	'''

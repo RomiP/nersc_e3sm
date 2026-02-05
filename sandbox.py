@@ -298,11 +298,12 @@ def plot_heatmap(runnum):
 	# plt.savefig(f'figs/qnet_climo_oct-mar_{runtype}{runnum}.png')
 	plt.show()
 
-def plot_field_by_date(date, field, runnum, plotargs={}):
+def plot_field_by_date(date, field, runnum, percentile=-1, plotargs={}):
 	runtype = 'historical'
 	filemap = {'composites': ['qnet'],
 			   'atm':[],
-			   'ocn':[]}
+			   'ice':['sic'],
+			   'ocn':['maxMLD', 'bvfml']}
 
 	if field in filemap['composites']:
 		if field == 'qnet':
@@ -310,23 +311,41 @@ def plot_field_by_date(date, field, runnum, plotargs={}):
 			qnet_file = f'/global/cfs/cdirs/m1199/romina/data/composite_fields/netHeatFlux_{runtype}.nc'
 			dat = xr.open_dataset(qnet_file)
 			lat, lon, cellnum = mpaso_mesh_latlon()
+		if runnum == 'avg':
+			dat = dat.mean(dim='runname')
+		else:
+			dat = dat.sel(runname=runtype + runnum)
 	elif field in filemap['atm']:
 		dat = get_atmo_file_by_date(date.year, date.month, runtype+runnum)
+	elif field in filemap['ice']:
+		dat = get_mpassi_file_by_date(date.year, date.month, runtype+runnum)
 	elif field in filemap['ocn']:
-		date = get_mpaso_file_by_date(date.year, date.month, runtype+runnum)
+		if 'max' in field:
+			dat = get_mpaso_file_by_date(date.year, date.month, runtype + runnum,
+										  varname='timeSeriesStatsMonthlyMax')
+		else:
+			dat = get_mpaso_file_by_date(date.year, date.month, runtype+runnum)
+
+		field = VARNAMES[field]
 		lat, lon, cellnum = mpaso_mesh_latlon()
 
-	if runnum == 'avg':
-		dat = dat.mean(dim='runname')
-	else:
-		dat = dat.sel(runname=runtype + runnum)
+
+
+	fielddata = dat[field].values
 
 	# climo for specific months
 	y, m, d = dt64_y_m_d(dat.Time.values)
 
 	dat = dat.isel(Time=(y==date.year) & (m==date.month))
 
-	fig, ax = unstructured_pcolor(lat, lon, dat[field].values, **plotargs)
+	fig, ax = unstructured_pcolor(lat, lon, fielddata, **plotargs)
+
+	if percentile != -1:
+		poly_file = 'regional_masks/LabSea_central.geojson'
+		my_json = open(poly_file).read()
+		mask = geopolygon_mask(my_json, lon, lat)
+		p = np.percentile(fielddata.squeeze()[mask], percentile)
+		print(f'{percentile} percentile: {p}')
 
 	return fig, ax
 
@@ -348,25 +367,74 @@ if __name__ == '__main__':
 
 	# %% Make some one-off plots of qnet for weird convection years
 
+	# field = 'qnet'
+	# plotargs = dict(
+	# 	projname='Miller',
+	# 	extent=[-70, -30, 50, 70],
+	# 	clim=[-400, 100],
+	# 	cmap='coolwarm',
+	# 	norm=0,
+	# 	clabel='Net Heat Flux ($W/m^2$)',
+	# 	# extenttype='tight',
+	# 	gridlines=True,
+	# 	title=' Oct-Mar',
+	# )
+
+	field = 'maxMLD'
 	plotargs = dict(
 		projname='Miller',
 		extent=[-70, -30, 50, 70],
-		clim=[-400, 100],
-		cmap='coolwarm',
-		norm=0,
-		clabel='Net Heat Flux ($W/m^2$)',
+		clim=[0, 3000],
+		cmap='turbo',
+		clabel='Max MLD (m)',
 		# extenttype='tight',
+		dotsize=1,
 		gridlines=True,
 		title=' Oct-Mar',
 	)
+
+	# field = 'sic'
+	# plotargs = dict(
+	# 	projname='Miller',
+	# 	extent=[-70, -30, 50, 70],
+	# 	clim=[0, 1],
+	# 	cmap='turbo',
+	# 	clabel='Sea Ice Concentration',
+	# 	# extenttype='tight',
+	# 	dotsize=1,
+	# 	gridlines=True,
+	# 	title=' Oct-Mar',
+	# )
+
+	# field = 'bvfml'
+	# plotargs = dict(
+	# 	projname='Miller',
+	# 	extent=[-70, -30, 50, 70],
+	# 	clim=[0, 5e-5],
+	# 	cmap='viridis',
+	# 	clabel='Mixel Layer Brunt-Vaisala Freq. ($s^{-2}$)',
+	# 	# extenttype='tight',
+	# 	dotsize=1,
+	# 	gridlines=True,
+	# 	title=' Oct-Mar',
+	# )
+
+	'''
+	run 0101
+	1986, high qnet, deep ml
+	2012, high qnet, shallow ml -> 1950, 1969 deep ml, similar qnet
+	'''
+
 	for month in [1,2,3,4]:
-		date = dt.datetime(1978, month, 1)
+		date = dt.datetime(2012, month, 1)
 		plotargs['title'] = date.strftime('%b %Y')
 		plot_field_by_date(date,
-						   'qnet',
-						   '0101', plotargs=plotargs)
+						   field=field,
+						   runnum='0101',
+						   percentile=99,
+						   plotargs=plotargs)
 
-		plt.savefig(f'figs/qnet_byMonth/qnet_{date.strftime("%Y_%m")}.png')
+		# plt.savefig(f'figs/qnet_byMonth/qnet_{date.strftime("%Y_%m")}.png')
 		plt.show()
 
 
