@@ -1,10 +1,16 @@
+import cartopy.crs as ccrs
+import geopandas as gpd
 from helpers import *
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 from open_e3sm_files import *
 import os
+from scipy.spatial import ConvexHull
+from shapely.geometry import Polygon
 import xarray as xr
+
+
 
 # from analysis.make_plots import make_scatter_plot
 from mpas_analysis.shared.io.utility import get_files_year_month, decode_strings
@@ -349,13 +355,71 @@ def plot_field_by_date(date, field, runnum, percentile=-1, plotargs={}):
 
 	return fig, ax
 
+def putz_w_labsea_dcmask():
+	maskgeojson = 'regional_masks/LabSeaWhole.geojson'
+	lat, lon, ncells = mpaso_mesh_latlon()
+	runtype = 'historical'
+	runnum = '0101'
+	varname = 'maxMLD'
+	month = [1, 2, 3]
+	ovr_write = False
+	if isinstance(month, int):
+		climo = get_climatology(varname, month, runtype)
+		mstr = f'm{month:02}'
+	else:
+		climo = get_climatology(varname, month[0], runtype)
+		for m in month[1:]:
+			climo[varname].data += get_climatology(varname, m, runtype)[varname].data
 
+		climo[varname].data /= len(month)
+		mstr = f'{MONTHS[month[0] - 1]}-{MONTHS[month[-1] - 1]}'
+
+	if runnum == 'avg':
+		climo = climo.mean(dim='runname')
+	else:
+		climo = climo.sel(runname=runtype + runnum)
+
+	climo = climo[varname].values.squeeze()
+
+	poly_file = 'regional_masks/LabSea_central.geojson'
+	my_json = open(poly_file).read()
+	mask = geopolygon_mask(my_json, lon, lat)
+	mask = mask & (climo > 1000)
+
+	coords = np.array([lon, lat]).T
+	points = coords[mask, :]
+
+	hull = ConvexHull(points)
+
+
+	print('here')
+	poly = Polygon(points[hull.vertices])
+	print('poly made')
+	# 4. Create a GeoDataFrame
+	gdf = gpd.GeoDataFrame(index=[0], crs="EPSG:4326", geometry=[poly])
+	print('gdf')
+	# with open('regional_masks/model_dczone.geojson', 'w') as file:
+	# 	file.write(gdf.to_json())
+
+	fig, ax = unstructured_pcolor(lat, lon, climo,
+								  extent=[-70, -30, 50, 70],
+								  clim=[100, 3500],
+								  title=runtype + runnum + ' Jan-Mar Climatology')
+	for simplex in hull.simplices:
+		plt.plot(points[simplex, 0], points[simplex, 1], 'r-',
+				 transform=ccrs.PlateCarree(),
+				 zorder=100)
+
+	plt.savefig('figs/LabSea_DCMask.png')
+	plt.show()
 if __name__ == '__main__':
 	# supported values are ['gtk3agg', 'gtk3cairo', 'gtk4agg', 'gtk4cairo', 'macosx', 'nbagg', 'notebook', 'qtagg',
 	# 'qtcairo', 'qt5agg', 'qt5cairo', 'tkagg', 'tkcairo', 'webagg', 'wx', 'wxagg', 'wxcairo', 'agg', 'cairo', 'pdf',
 	# 'pgf', 'ps', 'svg', 'template', 'module://backend_interagg', 'inline']
 	matplotlib.use('module://backend_interagg')
 	# print(matplotlib.get_backend())
+
+	putz_w_labsea_dcmask()
 
 	# unstructured_pcolor(0,0,0)
 	# open_some_data()
@@ -425,17 +489,17 @@ if __name__ == '__main__':
 	2012, high qnet, shallow ml -> 1950, 1969 deep ml, similar qnet
 	'''
 
-	for month in [1,2,3,4]:
-		date = dt.datetime(2012, month, 1)
-		plotargs['title'] = date.strftime('%b %Y')
-		plot_field_by_date(date,
-						   field=field,
-						   runnum='0101',
-						   percentile=99,
-						   plotargs=plotargs)
-
-		# plt.savefig(f'figs/qnet_byMonth/qnet_{date.strftime("%Y_%m")}.png')
-		plt.show()
+	# for month in [1,2,3,4]:
+	# 	date = dt.datetime(2012, month, 1)
+	# 	plotargs['title'] = date.strftime('%b %Y')
+	# 	plot_field_by_date(date,
+	# 					   field=field,
+	# 					   runnum='0101',
+	# 					   percentile=99,
+	# 					   plotargs=plotargs)
+	#
+	# 	# plt.savefig(f'figs/qnet_byMonth/qnet_{date.strftime("%Y_%m")}.png')
+	# 	plt.show()
 
 
 

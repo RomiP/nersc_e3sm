@@ -1,7 +1,10 @@
 import numpy as np
+import geopandas as gpd
 from helpers import *
 from open_e3sm_files import *
 from plot_unstructured import *
+from cartopy.feature import ShapelyFeature
+
 
 def plot_climo(runnum='avg'):
 	runtype = 'historical'
@@ -39,12 +42,22 @@ def plot_climo(runnum='avg'):
 								  extenttype='tight',
 								  cmap='viridis',
 								  # clim=[99500, 102500],
-								  clim=[100, 2500],
+								  clim=[0, 2500],
 								  # dotsize=5,
 								  gridlines=True,
 								  landmask=True,
 								  interp='grid')
 	plt.title(f'{varname} Climatology {mstr} {runtype + runnum}')
+
+	gdf = gpd.read_file('regional_masks/map.geojson')
+	# ax.add_geometries([geo_polygon], crs=ccrs.PlateCarree(),
+	# 				  facecolor='blue', alpha=0.5, edgecolor='black')
+	# 3. Create a ShapelyFeature
+	geoms = gdf.geometry.values
+	feat = ShapelyFeature(geoms, ccrs.PlateCarree(), edgecolor='red', facecolor='none')
+
+	# 4. Add to cartopy
+	ax.add_feature(feat)
 
 	plt.savefig(f'figs/{varname}_climo_{mstr.lower()}_{runtype+runnum}.png')
 	plt.show()
@@ -217,6 +230,7 @@ if __name__ == '__main__':
 		print(run)
 		# get_extrema_ts(run, 3)
 		# plot_qnet_extrema_comps(run)
-		plot_maxMLD_extrema(run)
+		# plot_maxMLD_extrema(run)
 
-	# 	plot_climo(run)
+		plot_climo(run)
+		break

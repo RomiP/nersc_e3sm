@@ -215,7 +215,7 @@ def get_climatology(varname, month, runtype, overwrite=False):
 	}
 
 	ice_fields = {
-		'iceArea': 'timeMonthly_avg_iceAreaCell',
+		'sic': 'timeMonthly_avg_iceAreaCell',
 		'filename': 'timeSeriesStatsMonthly',
 	}
 
@@ -260,7 +260,7 @@ def get_climatology(varname, month, runtype, overwrite=False):
 			else:
 				climodat.data += modeldat[vname_long].values
 
-			if 'Time' in modeldat:
+			if 'Time' in modeldat.dims:
 				times_included.append(modeldat.Time.values[0])
 			else:
 				times_included.append(modeldat.time.values[0])

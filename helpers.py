@@ -4,12 +4,16 @@ import geopandas as gpd
 import json
 import matplotlib.pyplot as plt
 import numpy as np
+from mpl_toolkits.mplot3d.proj3d import transform
+
+from open_e3sm_files import get_climatology
 import shapely
 from shapely.geometry import Polygon, LineString
 from shapely.ops import unary_union, polygonize
 from typing import Union
 import xarray as xr
 
+from open_e3sm_files import mpaso_mesh_latlon
 
 MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -21,6 +25,8 @@ VARNAMES = {
 	'lwhfu':'timeMonthly_avg_longWaveHeatFluxUp',
 	'swhf':'timeMonthly_avg_shortWaveHeatFlux',
 	'qsens':'timeMonthly_avg_sensibleHeatFlux',
+	'sic':'timeMonthly_avg_iceAreaCell',
+	'isice':'timeMonthly_avg_icePresent',
 }
 
 def rotate(l: Union[list, np.array], k: int) -> Union[list, np.array]:
@@ -141,13 +147,16 @@ def geopolygon_mask(geojson_polygon: str, lons: np.ndarray, lats: np.ndarray) ->
 	return shapely.contains(polygon, points)
 
 
-def make_geopoly_from_bath(bath, depth):
+def make_geopoly_from_contour(data, lon, lat, level):
 	crs = "EPSG:4326"
 	fig, ax = plt.subplots()
 	# One isobath level. If your dataset uses positive depths, set isobath_value accordingly.
-	CS = ax.contour(bath.lon.values, bath.lat.values, bath.elevation.values, levels=[-depth])
+
+	# editting to make for arbitrary contour
+	CS = ax.contour(lon, lat, data, levels=[level])
 
 	plt.close(fig)  # no need to render
+	# plt.show()
 
 	polygons = []
 
@@ -192,20 +201,29 @@ def make_geopoly_from_bath(bath, depth):
 		valid_polys.append(poly)
 
 	if not valid_polys:
+		print('not valid polygon')
 		return gpd.GeoDataFrame({"level": []}, geometry=[], crs=crs)
 
-	gdf = gpd.GeoDataFrame({"level": [depth] * len(valid_polys)}, geometry=valid_polys, crs=crs)
+	gdf = gpd.GeoDataFrame({"level": [level] * len(valid_polys)}, geometry=valid_polys, crs=crs)
 
 	# Optional simplification (careful: can alter topology)
 	simplify_tolerance = 10
 	if simplify_tolerance and simplify_tolerance > 0:
 		gdf["geometry"] = gdf.geometry.simplify(simplify_tolerance, preserve_topology=True)
 
-		return gdf
+	print('make the plot!')
+	# Plot the polygon
+	fig, ax = plt.subplots()
+	ax.set_aspect('equal')  # Ensures the aspect ratio is correct for geospatial data
+	gdf.plot(ax=ax, color='blue', edgecolor='black', alpha=0.5)  # Plot with custom style
+	plt.title("Geospatial Polygon Plot")
+	plt.xlabel("Longitude")
+	plt.ylabel("Latitude")
+	plt.show()
+
+	return gdf
 
 
 if __name__ == '__main__':
 
-	maskgeojson = 'regional_masks/LabSeaWhole.geojson'
-	lat, lon, ncells
-	geopolygon_mask()
+	pass

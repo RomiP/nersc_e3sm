@@ -19,7 +19,7 @@ import xarray as xr
 def max_mld_percentile_ts(runname, startdate, enddate):
 	lat, lon, ncell = mpaso_mesh_latlon()
 
-	poly_file = 'regional_masks/LabSea_central.geojson'
+	poly_file = 'regional_masks/model_dczone.geojson'
 	my_json = open(poly_file).read()
 	mask = geopolygon_mask(my_json, lon, lat)
 
@@ -54,6 +54,8 @@ def max_mld_percentile_ts(runname, startdate, enddate):
 			modeldat = xr.open_dataset(fname)
 		else:
 			modeldat = get_mpaso_file_by_date(date.year, date.month, runname, 'timeSeriesStatsMonthlyMax')
+			icemask = seaice_mask(runname, date)
+
 
 		modeldat = modeldat.sel(nCells=ncell)
 		modeldat = modeldat[varname].data.squeeze()[mask]
@@ -98,9 +100,10 @@ def make_maxMLD_percentile_ts_dataset():
 
 	ds = xr.Dataset({'maxMLD': da})
 	ds.attrs['units'] = 'm'
-	ds.attrs['description'] = 'Labrador Sea region (central) 99th percentile of maxMLD recorded over monthly time period.'
+	# ds.attrs['description'] = 'Labrador Sea region (central) 99th percentile of maxMLD recorded over monthly time period.'
+	ds.attrs['description'] = 'Labrador Sea maxMLD mean over deep convection zone recorded over monthly time period.'
 
-	ds.to_netcdf('/global/cfs/cdirs/m1199/romina/data/timeseries/maxMLDmean_ts_historical.nc', mode='a')
+	ds.to_netcdf('/global/cfs/cdirs/m1199/romina/data/timeseries/maxMLD_dcmean_ts_historical.nc', mode='a')
 
 def plot_maxMLD_hist(runname, startdate, enddate):
 	lat, lon, ncell = mpaso_mesh_latlon()
@@ -180,8 +183,6 @@ def plot_maxMLD_hist(runname, startdate, enddate):
 	# plt.show()
 
 	return dates, mld
-
-
 
 def plot_mld_climo(runnum):
 
@@ -356,8 +357,8 @@ def plot_mld_vs_qnet(run, type):
 	monthrange = [1, 4]
 
 	root = '/global/cfs/cdirs/m1199/romina/data/timeseries/'
-	mldfile = f'maxMLDstd_ts_{type}.nc'
-	qnetfile = f'netHeatFlux_LabSeaWhole_{type}.nc'
+	mldfile = f'maxMLD_dcmean_ts_{type}.nc'
+	qnetfile = f'netHeatFlux_LabSeaDC_{type}.nc'
 
 	mlddata = xr.open_dataset(root + mldfile)
 	qnetdata = xr.open_dataset(root + qnetfile)
@@ -389,31 +390,31 @@ def plot_mld_vs_qnet(run, type):
 	plt.title(f'E3SM Mean Q_net Effect on Max MLD ({type + run})\nmonths: {monthrange[0]}-{monthrange[1]}')
 
 	plt.ylim(0,3500)
-	plt.xlim(-150, 0)
+	plt.xlim(-300, 0)
 
-	i = mld < 600
-	print('------ mld < 600 m ------')
-	print(years[i])
-	print(mld[i])
-	print(qnet[i])
-
-	i = mld > 3000
-	print('------ mld > 3000 m ------')
-	print(years[i])
-	print(mld[i])
-	print(qnet[i])
-
-	i = qnet > -90
-	print('------ qnet > -90 W/m^2 ------')
-	print(years[i])
-	print(mld[i])
-	print(qnet[i])
-
-	i = qnet < -100
-	print('------ qnet < -100 W/m^2 ------')
-	print(years[i])
-	print(mld[i])
-	print(qnet[i])
+	# i = mld < 600
+	# print('------ mld < 600 m ------')
+	# print(years[i])
+	# print(mld[i])
+	# print(qnet[i])
+	#
+	# i = mld > 3000
+	# print('------ mld > 3000 m ------')
+	# print(years[i])
+	# print(mld[i])
+	# print(qnet[i])
+	#
+	# i = qnet > -90
+	# print('------ qnet > -90 W/m^2 ------')
+	# print(years[i])
+	# print(mld[i])
+	# print(qnet[i])
+	#
+	# i = qnet < -100
+	# print('------ qnet < -100 W/m^2 ------')
+	# print(years[i])
+	# print(mld[i])
+	# print(qnet[i])
 
 
 	# stats for only years with MLD >300m
@@ -427,7 +428,7 @@ def plot_mld_vs_qnet(run, type):
 	ax = plt.gca()
 	plt.text(.05, 0.95, f'$R^2$ = {r2}', ha='left', va='top', transform=ax.transAxes)
 	ax.invert_yaxis()
-	plt.savefig(f'figs/qnet_vs_maxMLDstd_{type + run}_m{monthrange[0]:02}-{monthrange[1]:02}.png')
+	plt.savefig(f'figs/qnet_vs_maxMLD_DCzone_{type + run}_m{monthrange[0]:02}-{monthrange[1]:02}.png')
 
 	plt.show()
 
@@ -509,12 +510,26 @@ def mean_N2_with_depth(depth_range, dates, runnum, regional_mask=None):
 	plt.show()
 	return n2
 
+def seaice_mask(runnum, date, threshold=0):
+
+	seaice_ds = get_mpassi_file_by_date(date.year, date.month, runnum)
+	if threshold == 0:
+		varname = VARNAMES['isice']
+		mask = seaice_ds[varname].values
+	else:
+		varname = VARNAMES['sic']
+		mask = seaice_ds[varname].values < threshold
+	return np.squeeze(mask)
+
+
 
 if __name__ == '__main__':
 	enseble = ['0101', '0151', '0201', '0251', '0301', 'avg']
 	# dates = make_monthly_date_list(dt.datetime(1950, 1, 1),
 	# 							   dt.datetime(2015, 1, 1))
 	# mask = get_arctic_ocn_region_mask('Labrador Sea')
+
+
 
 	# plot_maxMLD_hist('historical0101',
 	# 				 dt.datetime(2012, 1, 1),
@@ -523,15 +538,19 @@ if __name__ == '__main__':
 	# max_mld_percentile_ts(runnum)
 	# make_maxMLD_percentile_ts_dataset()
 
-	max_mld_heatmap()
+	# max_mld_heatmap()
 	# plot_heatmap()
 
-	# for i in enseble[:]:
-	# 	print(i)
-	# # 	plot_mld_climo(i)
-	# # 	plot_mld_ts(i)
-	# 	plot_mld_vs_qnet(i, 'historical')
-	# 	# mean_N2_with_depth([0, 1000], dates, 'historical' + i, mask)
+	# seaice_mask('historical0101',
+	# 			dt.datetime(2002, 1, 1),
+	# 			0.5)
+
+	for i in enseble[:]:
+		print(i)
+	# 	plot_mld_climo(i)
+	# 	plot_mld_ts(i)
+		plot_mld_vs_qnet(i, 'historical')
+		# mean_N2_with_depth([0, 1000], dates, 'historical' + i, mask)
 
 	# plot_mld_vs_nao()
 	# plot_mld_vs_qnet()

@@ -59,7 +59,7 @@ def extract_ts_from_composite_file():
 	# dc_mask = xr.open_dataset(f'/global/cfs/projectdirs/m1199/romina/data/misc/maxMLDmask_{type}.nc')
 	# mask = dc_mask['maxMLDmask']
 
-	geopoly_file = 'regional_masks/LabSea_whole.geojson'
+	geopoly_file = 'regional_masks/model_dczone.geojson'
 	with open(geopoly_file, 'r') as f:
 		geopoly = f.read()
 	lat, lon, ncells = mpaso_mesh_latlon()
@@ -71,7 +71,7 @@ def extract_ts_from_composite_file():
 	# dat = dat.where(dat.nCells * mask, drop=False).mean(dim='nCells')
 	dat = dat.where(mask, drop=False).mean(dim='nCells')
 
-	dat.to_netcdf(f'/global/cfs/projectdirs/m1199/romina/data/timeseries/netHeatFlux_LabSeaWhole_{type}.nc')
+	dat.to_netcdf(f'/global/cfs/projectdirs/m1199/romina/data/timeseries/netHeatFlux_LabSeaDC_{type}.nc')
 
 
 if __name__ == '__main__':
