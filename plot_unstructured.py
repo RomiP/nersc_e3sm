@@ -208,4 +208,7 @@ def unstructured_pcolor(lat, lon, dat, **kwargs):
 		gl.xformatter = ctk.LongitudeFormatter(zero_direction_label=True)
 		gl.yformatter = ctk.LatitudeFormatter()
 
+	if 'sc_handle' in kwargs and kwargs['sc_handle']:
+		return fig, ax, colplot
+
 	return fig, ax

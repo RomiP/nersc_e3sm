@@ -29,6 +29,13 @@ VARNAMES = {
 	'isice':'timeMonthly_avg_icePresent',
 }
 
+COMPONENTS = {'composites': ['qnet'],
+			   'atm':[],
+			   'ice':['sic'],
+			   'ocn':['maxMLD', 'bvfml', 'lwhfd', 'lwhfu', 'swhf', 'qsens', 'qlat']}
+
+
+
 def rotate(l: Union[list, np.array], k: int) -> Union[list, np.array]:
 	'''
 	Rotate list or array k steps to the left

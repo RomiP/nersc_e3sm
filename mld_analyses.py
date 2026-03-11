@@ -366,15 +366,20 @@ def plot_mld_vs_qnet(run, type):
 	if 'avg' in run:
 		mlddata = mlddata.mean(dim='runname')
 		qnetdata = qnetdata.mean(dim='runname')
+	if 'all' in run:
+		pass
 	else:
 		qnetdata = qnetdata.sel(runname=type + run)
 		mlddata = mlddata.sel(runname=type + run)
 
 
-	qnet = qnetdata['netHeatFlux'].values
-	mld = mlddata['maxMLD'].values
+	qnet = qnetdata['netHeatFlux']#.values.reshape(-1,)
+	mld = mlddata['maxMLD'].values#.reshape(-1,)
+	time = qnetdata.Time.values
+	# if len(time) != len(qnet):
+	# 	time = time.repeat(len(qnet)//len(time))
 
-	qnet, years = ts_seasonal_avg(qnet, qnetdata.Time.values, monthrange)
+	qnet, years = ts_seasonal_avg(qnet, time, monthrange)
 
 	mld = mld.reshape(-1, 12)
 	mld = np.max(mld, axis=1)
@@ -428,8 +433,75 @@ def plot_mld_vs_qnet(run, type):
 	ax = plt.gca()
 	plt.text(.05, 0.95, f'$R^2$ = {r2}', ha='left', va='top', transform=ax.transAxes)
 	ax.invert_yaxis()
-	plt.savefig(f'figs/qnet_vs_maxMLD_DCzone_{type + run}_m{monthrange[0]:02}-{monthrange[1]:02}.png')
+	# plt.savefig(f'figs/qnet_vs_maxMLD_DCzone_{type + run}_m{monthrange[0]:02}-{monthrange[1]:02}.png')
 
+	plt.show()
+
+def plot_mld_vs_qnet_allmembers(type):
+	# type = 'historical'
+	# run = 'avg'
+	# monthrange = [10, 3]
+	monthrange = [1, 4]
+	qname = 'qsens'
+	root = '/global/cfs/cdirs/m1199/romina/data/timeseries/'
+	mldfile = f'maxMLD_dcmean_ts_{type}.nc'
+	qnetfile = f'{qname}_dcmean_ts_{type}.nc'
+
+	mldds = xr.open_dataset(root + mldfile)
+	qnetds = xr.open_dataset(root + qnetfile)
+
+	all_qnet = []
+	all_mld = []
+	for run in qnetds.runname.values:
+		# print(run)
+		qnetdata = qnetds.sel(runname=run)
+		mlddata = mldds.sel(runname=run)
+
+		qnet = qnetdata[qname].values
+		mld = mlddata['maxMLD'].values
+		time = qnetdata.time.values
+
+		qnet, years = ts_seasonal_avg(qnet, time, monthrange)
+
+		mld = mld.reshape(-1, 12)
+		mld = np.max(mld, axis=1)
+		if monthrange[1]<monthrange[0]:
+			mld = mld[:-1]
+
+		plt.scatter(qnet, mld, label=run)
+		all_qnet.append(qnet)
+		all_mld.append(mld)
+
+
+	# idx = mld > 300
+	#
+	# plt.scatter(qnet[idx], mld[idx])
+	# plt.scatter(qnet[~idx], mld[~idx])
+	plt.xlabel('Net Heat Flux ($W/m^2$)')
+	plt.ylabel('Max MLD (m)')
+	plt.title(f'E3SM Mean {qname} Effect on Max MLD \nmonths: {monthrange[0]}-{monthrange[1]}')
+
+	plt.ylim(0,3500)
+	plt.xlim(-300, 0)
+	plt.legend()
+
+
+
+	# stats for only years with MLD >300m
+	all_qnet = np.array(all_qnet).reshape(-1)
+	all_mld = np.array(all_mld).reshape(-1)
+	idx = all_mld > 300
+	all_mld = all_mld[idx]
+	all_qnet = all_qnet[idx]
+	# years = years[idx]
+	corr = np.corrcoef(all_mld, all_qnet)[0, 1]
+	r2 = round(corr ** 2, 4)
+	print(corr)
+
+	ax = plt.gca()
+	plt.text(.05, 0.95, f'$R^2$ = {r2}', ha='left', va='top', transform=ax.transAxes)
+	ax.invert_yaxis()
+	plt.savefig(f'figs/{qname}_vs_maxMLD_DCzone_{type}all_m{monthrange[0]:02}-{monthrange[1]:02}.png')
 	plt.show()
 
 def max_mld_heatmap():
@@ -545,12 +617,13 @@ if __name__ == '__main__':
 	# 			dt.datetime(2002, 1, 1),
 	# 			0.5)
 
-	for i in enseble[:]:
-		print(i)
-	# 	plot_mld_climo(i)
-	# 	plot_mld_ts(i)
-		plot_mld_vs_qnet(i, 'historical')
-		# mean_N2_with_depth([0, 1000], dates, 'historical' + i, mask)
+	plot_mld_vs_qnet_allmembers('historical')
+	# for i in enseble[:]:
+	# 	print(i)
+	# # 	plot_mld_climo(i)
+	# # 	plot_mld_ts(i)
+	# 	plot_mld_vs_qnet(i, 'historical')
+	# 	# mean_N2_with_depth([0, 1000], dates, 'historical' + i, mask)
 
 	# plot_mld_vs_nao()
 	# plot_mld_vs_qnet()
