@@ -1,3 +1,4 @@
+import cmasher as cmr
 import datetime as dt
 from helpers import *
 import numpy as np
@@ -67,17 +68,13 @@ def animation(frames, lat, lon, saveas, titles=[], **kwargs):
 
 	print('init animation')
 	ani = FuncAnimation(fig, update, frames=len(frames), blit=False, interval=50)
-	# print('writing animation')
-	# writer = FFMpegWriter(fps=4, codec="libx264", bitrate=2500,
-	# 					  extra_args=["-pix_fmt", "yuv420p", "-preset", "veryfast"])
-	# # writer = FFMpegWriter(fps=4, codec="libvpx-vp9", bitrate=2500, extra_args=["-pix_fmt", "yuv420p"])
-	# ani.save("figs/testdata.mp4", writer=writer, dpi=110)
 	save_with_progress(fig, update, nframes=len(frames), fps=4, out_path=saveas)
+	plt.show()
 
 
-def animate_e3sm_2d(runnum):
+def animate_e3sm_2d(runnum, index_var):
 	dates = make_monthly_date_list(dt.datetime(1950, 1, 1), dt.datetime(2014, 12, 31))
-	index_var = 'maxMLD'
+	# index_var = 'siv'
 	runtype = 'historical'
 	varname = VARNAMES[index_var]
 
@@ -89,26 +86,85 @@ def animate_e3sm_2d(runnum):
 
 	frames = []
 	titles = []
-	for d in tqdm(dates):
-		ds = get_mpaso_file_by_date(d.year, d.month, runtype + runnum, varname='timeSeriesStatsMonthlyMax')
+	for d in tqdm(dates[:]):
+		if index_var in COMPONENTS['ocn']:
+			ds = get_mpaso_file_by_date(d.year, d.month, runtype + runnum, varname='timeSeriesStatsMonthlyMax')
+		elif index_var in COMPONENTS['ice']:
+			ds = get_mpassi_file_by_date(d.year, d.month, runtype + runnum)
+		elif index_var in COMPONENTS['composites']:
+			pass
+		elif index_var in COMPONENTS['atm']:
+			pass
 		frames.append(ds[varname].values.squeeze()[mask])
 		titles.append(d.strftime('%Y %B'))
 
-	plotargs = dict(
-		projname='Miller',
-		extent=[-70, -30, 50, 70],
-		clim=[0, 3000],
-		cmap='turbo',
-		clabel='Max MLD (m)',
-		# extenttype='tight',
-		dotsize=1,
-		gridlines=True,
-		title=' Test',
-	)
+	if index_var == 'maxMLD':
+		plotargs = dict(
+			projname='Miller',
+			extent=[-70, -30, 50, 70],
+			clim=[0, 3000],
+			cmap='turbo',
+			clabel='Max MLD (m)',
+			landmask=True,
+			dotsize=1,
+			gridlines=True,
+			title=' Test',
+		)
+	elif index_var == 'sic':
+		plotargs = dict(
+			projname='Miller',
+			extent=[-70, -30, 50, 70],
+			clim=[0, 1],
+			# cmap='Blues_r',
+			cmap=cmr.ocean,
+			clabel='Sea Ice Concentration (%)',
+			landmask=True,
+			dotsize=1,
+			gridlines=True,
+			title = 'place holder'
+		)
+	elif index_var == 'sssal':
+		plotargs = dict(
+			projname='Miller',
+			extent=[-70, -30, 50, 70],
+			clim=[30, 36],
+			cmap='viridis',
+			# cmap=cmr.ocean,
+			clabel='Sea Surface Salinity (psu)',
+			landmask=True,
+			dotsize=1,
+			gridlines=True,
+			title='place holder'
+		)
+	elif index_var == 'siv':
+		plotargs = dict(
+			projname='Miller',
+			extent=[-70, -30, 50, 70],
+			clim=[0, 2],
+			cmap='Blues_r',
+			# cmap=cmr.cosmic,
+			clabel='Sea Ice Thickness (m)',
+			landmask=True,
+			dotsize=1,
+			gridlines=True,
+			title='place holder'
+		)
+	else:
+		plotargs = dict(
+			projname='Miller',
+			extent=[-70, -30, 50, 70],
+			cmap='Turbo',
+			landmask=True,
+			dotsize=1,
+			gridlines=True,
+			title='place holder'
+		)
+
 	savename = f'figs/{runtype}{runnum}_{index_var}.mp4'
 	animation(frames, lat, lon, savename, titles, **plotargs)
 
 
 if __name__ == '__main__':
-	animate_e3sm_2d('0101')
-# copilot_example()
+	enseble = ['0101', '0151', '0201', '0251', '0301', 'avg']
+	for i in enseble:
+		animate_e3sm_2d(i, 'maxMLD')

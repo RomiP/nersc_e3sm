@@ -158,6 +158,38 @@ def make_regionalavg_ts_dataset(fieldname, units):
 	ds.to_netcdf(f'/global/cfs/cdirs/m1199/romina/data/timeseries/{fieldname}_dcmean_ts_historical.nc', mode='a')
 
 
+def make_CDT_prof_dataset(runnum):
+
+	lat, lon, ncell = mpaso_mesh_latlon()
+	mask = geopolygon_mask('regional_masks/model_dczone.geojson', lon, lat)
+
+	runnum = 'historical' + runnum
+	startdate = dt.datetime(1950, 1, 1)
+	enddate = dt.datetime(2015, 1, 1)
+	dates = make_monthly_date_list(startdate, enddate)
+
+	prof = []
+	for d in tqdm(dates):
+		ds = get_mpaso_file_by_date(d.year, d.month, runnum)
+		ctd = ds[['timeMonthly_avg_density', 'timeMonthly_avg_activeTracers_salinity',
+				  'timeMonthly_avg_activeTracers_temperature']]
+		p = ctd.where(ctd.nCells * mask).mean(dim='nCells')
+		prof.append(p)
+		# if prof is None:
+		# 	prof = p
+		# else:
+		# 	prof = xr.concat([prof, p], dim='Time')
+
+	print('concatenating')
+	prof = xr.concat(prof, dim='Time')
+	prof['z'] = ('nVertLevels', mpaso_depth())
+	prof['z'].attrs['units'] = 'm'
+	prof.to_netcdf(f'/global/cfs/projectdirs/m1199/romina/data/profiles/LabSea_ctd_dczone_{runnum}.nc')
+	print()
+
+
+
+
 if __name__ == '__main__':
 	# %% date ranges and params
 
@@ -182,7 +214,9 @@ if __name__ == '__main__':
 
 	# extract_ts_from_composite_file()
 
-	make_regionalavg_ts_dataset('lwhfu', 'W/m^2')
+	# make_regionalavg_ts_dataset('lwhfu', 'W/m^2')
+	for run in ['0101', '0151', '0251', '0301']:
+		make_CDT_prof_dataset(run)
 
 
 

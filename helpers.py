@@ -19,6 +19,8 @@ MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 
 
 VARNAMES = {
 	'maxMLD':'timeMonthlyMax_max_dThreshMLD',
+	'sal':'timeMonthly_avg_activeTracers_salinity',
+	'ocntemp':'timeMonthly_avg_activeTracers_temperature',
 	'bvfml':'timeMonthly_avg_bruntVaisalaFreqML',
 	'qlat':'timeMonthly_avg_latentHeatFlux',
 	'lwhfd':'timeMonthly_avg_longWaveHeatFluxDown',
@@ -27,12 +29,16 @@ VARNAMES = {
 	'qsens':'timeMonthly_avg_sensibleHeatFlux',
 	'sic':'timeMonthly_avg_iceAreaCell',
 	'isice':'timeMonthly_avg_icePresent',
+	'sssal':'timeMonthly_avg_seaSurfaceSalinity',
+	'sst':'timeMonthly_avg_seaSurfaceTemperature',
+	'sia':'timeMonthly_avg_iceAgeCell',
+	'siv':'timeMonthly_avg_iceVolumeCell',
 }
 
 COMPONENTS = {'composites': ['qnet'],
 			   'atm':[],
-			   'ice':['sic'],
-			   'ocn':['maxMLD', 'bvfml', 'lwhfd', 'lwhfu', 'swhf', 'qsens', 'qlat']}
+			   'ice':['sic', 'isice', 'sic', 'siv'],
+			   'ocn':['maxMLD', 'bvfml', 'lwhfd', 'lwhfu', 'swhf', 'qsens', 'qlat', 'sal', 'ocntemp']}
 
 
 
@@ -144,6 +150,9 @@ def geopolygon_mask(geojson_polygon: str, lons: np.ndarray, lats: np.ndarray) ->
 	>>> print(geopolygon_mask(my_json, lons, lats))
 	[0 1 0]
 	"""
+	if geojson_polygon.endswith('.geojson'):
+		geojson_polygon = open(geojson_polygon).read()
+
 	# Convert GeoJSON (as a string) to Shapely geometry
 	polygon = shapely.from_geojson(geojson_polygon)
 
