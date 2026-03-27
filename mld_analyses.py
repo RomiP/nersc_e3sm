@@ -1,7 +1,9 @@
 import xarray
+from numba.cuda.libdevice import cbrtf
 
 from atmo_analyses import ts_seasonal_avg
 from cftime import datetime as cdt
+from cftime import num2pydate
 import datetime as dt
 from helpers import *
 import matplotlib
@@ -13,6 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from dateutil.relativedelta import relativedelta
 from open_e3sm_files import *
+import seawater as sw
 from tqdm import tqdm
 import xarray as xr
 
@@ -593,6 +596,86 @@ def seaice_mask(runnum, date, threshold=0):
 		mask = seaice_ds[varname].values < threshold
 	return np.squeeze(mask)
 
+def ocean_hovmoller(runnum):
+	root = '/global/cfs/projectdirs/m1199/romina/data/'
+	fname = root + f'profiles/LabSea_ctd_dczone_{runnum}.nc'
+	tsname = root + 'timeseries/maxMLD_ts_historical.nc'
+
+	mld_ts = xr.open_dataset(tsname).sel(runname=runnum)
+
+	prof_ds = xr.open_dataset(fname)
+	prof_ds = prof_ds.isel(nVertLevels=(prof_ds['z'] < 3500))
+	time = np.array(
+		[np.datetime64(x.isoformat()) for x in prof_ds.Time.values]
+	)
+	field = 'dens'
+	varname = VARNAMES[field]
+	sname = VARNAMES['sal']
+	tname = VARNAMES['ocntemp']
+	dens = sw.dens0(prof_ds[sname].values, prof_ds[tname].values)
+	plt.pcolormesh(time, prof_ds['z'].values, dens.T, cmap='turbo')
+	cbar = plt.colorbar()
+	cbar.set_label('Density ($kg/m^3$)')
+	# plt.clim([1027, 1037])
+
+	plt.plot(mld_ts['time'], mld_ts['maxMLD'], color='k', linewidth=0.7)
+
+	plt.xlim(time[0], time[-1])
+	# plt.ylim([0, 100])
+	ax = plt.gca()
+	ax.invert_yaxis()
+
+	plt.xlabel('Date')
+	plt.ylabel('Depth (m)')
+	plt.title(f'Density and MLD ({runnum})')
+
+	plt.show()
+
+def plot_climo_profile(runnum, month):
+	root = '/global/cfs/projectdirs/m1199/romina/data/'
+	fname = root + f'profiles/LabSea_ctd_dczone_{runnum}.nc'
+	# tsname = root + 'timeseries/maxMLD_ts_historical.nc'
+	# mld_ts = xr.open_dataset(tsname).sel(runname=runnum)
+
+	prof_ds = xr.open_dataset(fname)
+	prof_ds = prof_ds.isel(nVertLevels=(prof_ds['z'] < 3500))
+
+	time = np.array(
+		[np.datetime64(x.isoformat()) for x in prof_ds.Time.values]
+	)
+	y, m, d = dt64_y_m_d(time)
+	field = 'dens'
+	varname = VARNAMES[field]
+	sname = VARNAMES['sal']
+	tname = VARNAMES['ocntemp']
+
+	climo = []
+
+	for i in range(len(time)):
+		if m[i] == month:
+			prof = prof_ds.isel(Time=i)
+			dens = sw.dens0(prof[sname].values, prof[tname].values)
+			# print(time[i].astype('datetime64[M]'), prof.Time.values)
+			plt.plot(dens, prof['z'].values, color='tab:grey', linewidth=0.7)
+			climo.append(dens)
+
+	climo = np.array(climo)
+	mu = np.nanmean(climo, axis=0)
+	sigma = np.nanstd(climo, axis=0)
+
+	plt.plot(mu, prof_ds['z'].values, color='tab:red')
+	plt.fill_betweenx(prof_ds['z'].values, mu - sigma, mu + sigma,
+					  color='tab:red', alpha=0.2, zorder=100)
+
+	ax = plt.gca()
+	plt.ylim([0, 1000])
+	plt.xlim([1026, 1028])
+	plt.title(f'{MONTHS[month-1]} Density Profile ({runnum})')
+	ax.invert_yaxis()
+	# print(f'figs/LabSea_density_m{month:02}_{runnum}.png')
+	plt.savefig(f'figs/LabSea_density_upper1km_m{month:02}_{runnum}.png')
+	plt.show()
+
 
 
 if __name__ == '__main__':
@@ -617,9 +700,13 @@ if __name__ == '__main__':
 	# 			dt.datetime(2002, 1, 1),
 	# 			0.5)
 
-	plot_mld_vs_qnet_allmembers('historical')
-	# for i in enseble[:]:
-	# 	print(i)
+	# plot_mld_vs_qnet_allmembers('historical')
+
+	for i in enseble[:-1]:
+		print(i)
+		# ocean_hovmoller('historical' + i)
+		for m in range(1, 13):
+			plot_climo_profile('historical' + i, m)
 	# # 	plot_mld_climo(i)
 	# # 	plot_mld_ts(i)
 	# 	plot_mld_vs_qnet(i, 'historical')

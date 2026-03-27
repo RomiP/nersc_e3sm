@@ -21,6 +21,7 @@ VARNAMES = {
 	'maxMLD':'timeMonthlyMax_max_dThreshMLD',
 	'sal':'timeMonthly_avg_activeTracers_salinity',
 	'ocntemp':'timeMonthly_avg_activeTracers_temperature',
+	'dens':'timeMonthly_avg_density',
 	'bvfml':'timeMonthly_avg_bruntVaisalaFreqML',
 	'qlat':'timeMonthly_avg_latentHeatFlux',
 	'lwhfd':'timeMonthly_avg_longWaveHeatFluxDown',
