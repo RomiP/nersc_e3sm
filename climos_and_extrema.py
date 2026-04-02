@@ -6,9 +6,8 @@ from plot_unstructured import *
 from cartopy.feature import ShapelyFeature
 
 
-def plot_climo(runnum='avg'):
+def plot_climo(runnum='avg', varname='maxMLD', **kwargs):
 	runtype = 'historical'
-	varname = 'maxMLD'
 	month = [1,2,3]
 	ovr_write = False
 	if isinstance(month, int):
@@ -49,7 +48,7 @@ def plot_climo(runnum='avg'):
 								  interp='grid')
 	plt.title(f'{varname} Climatology {mstr} {runtype + runnum}')
 
-	gdf = gpd.read_file('regional_masks/map.geojson')
+	gdf = gpd.read_file('regional_masks/model_dczone.geojson.geojson')
 	# ax.add_geometries([geo_polygon], crs=ccrs.PlateCarree(),
 	# 				  facecolor='blue', alpha=0.5, edgecolor='black')
 	# 3. Create a ShapelyFeature
@@ -59,7 +58,10 @@ def plot_climo(runnum='avg'):
 	# 4. Add to cartopy
 	ax.add_feature(feat)
 
-	plt.savefig(f'figs/{varname}_climo_{mstr.lower()}_{runtype+runnum}.png')
+	if 'saveas' in kwargs:
+		plt.savefig(kwargs['saveas'])
+	else:
+		plt.savefig(f'figs/{varname}_climo_{mstr.lower()}_{runtype+runnum}.png')
 	plt.show()
 
 def get_extrema_ts(runnum, k, **kwargs):
