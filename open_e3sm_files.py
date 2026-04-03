@@ -212,11 +212,15 @@ def get_climatology(varname, month, runtype, overwrite=False):
 	ocn_fields = {
 		'maxMLD':'timeMonthlyMax_max_dThreshMLD',
 		'filename':'timeSeriesStatsMonthlyMax',
+		'sst':'timeMonthly_avg_seaSurfaceTemperature',
 	}
 
 	ice_fields = {
 		'sic': 'timeMonthly_avg_iceAreaCell',
 		'filename': 'timeSeriesStatsMonthly',
+		'sia':'timeMonthly_avg_iceAgeCell',
+		'siv':'timeMonthly_avg_iceVolumeCell',
+		'sssal': 'timeMonthly_avg_seaSurfaceSalinity',
 	}
 
 	atm_fields = {
