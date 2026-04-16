@@ -281,7 +281,20 @@ def get_climatology(varname, month, runtype, overwrite=False):
 	ds.to_netcdf(fname)
 	return ds
 
+def get_ensemble_average(year, month, component, **kwargs):
 
+	data = []
+	ensemble_members = ['0101', '0151', '0201', '0251', '0301']
+	for member in ensemble_members:
+		if component == 'ocn':
+			data.append(get_mpaso_file_by_date(year, month, 'historical'+member, **kwargs))
+		elif component == 'ice':
+			data.append(get_mpassi_file_by_date(year, month, 'historical'+member, **kwargs))
+		elif component == 'atm':
+			data.append(get_atmo_file_by_date(year, month, 'historical'+member, **kwargs))
+
+	ds = xr.concat(data, dim='runname')
+	return ds
 
 if __name__ == '__main__':
 	# get_arctic_ocn_region_mask('Labrador Sea')

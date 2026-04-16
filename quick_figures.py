@@ -1,5 +1,8 @@
+import matplotlib.pyplot as plt
+
 from atmo_analyses import ts_seasonal_avg
 from cartopy.feature import ShapelyFeature
+import cartopy.feature as cfeature
 from climos_and_extrema import get_climatology
 import cmasher as cmr
 from helpers import *
@@ -61,7 +64,27 @@ def plot_geospatial_MLD_climo_convexhull():
 	plt.show()
 
 def plot_E3SM_spatial_resolution():
-	pass
+	lat, lon, ncells = mpaso_mesh_latlon()
+	lon[lon > 180] -= 360
+	mesh = xr.open_dataset(MESHFILE_OCN)
+	area = mesh.areaCell.values
+	area = np.sqrt(area)/1000
+	crs = ccrs.RotatedPole(pole_longitude=177.5, pole_latitude=37.5)
+
+	fig = plt.figure(dpi=300)
+	ax = fig.add_subplot(1, 1, 1, projection=ccrs.Orthographic(-10, 45))
+
+	ax.add_feature(cfeature.LAND, zorder=11, edgecolor='black')
+
+	ax.set_global()
+	plt.scatter(lon, lat, c=area, s=0.01, cmap='viridis_r',
+				zorder=10, transform=ccrs.PlateCarree())
+	cbar = plt.colorbar()
+	plt.clim(10, 50)
+	cbar.set_label('Horizontal resolution (km)')
+
+	plt.savefig('figs/pubs/MPASO_spatial_resolution.png')
+	plt.show()
 
 def plot_mld_ts(runnum):
 	# runnum = '0151'
@@ -325,11 +348,11 @@ if __name__ == '__main__':
 	# for run in ['0101', '0151', '0201', '0251', '0301']:
 	# 	plot_mld_qnet_scatter(run)
 		# plot_mld_ts(run)
-	# plot_E3SM_spatial_resolution()
+	plot_E3SM_spatial_resolution()
 
-	v = 'maxMLD'
-	plot_climo(runnum='0201', varname=v, month=[1, 2, 3])
-	plot_climo(runnum='avg', varname=v, month=[1, 2, 3])
+	# v = 'maxMLD'
+	# plot_climo(runnum='0201', varname=v, month=[1, 2, 3])
+	# plot_climo(runnum='avg', varname=v, month=[1, 2, 3])
 	# for month in [1, 2, 3]:
 	# 	# plot_e3sm_density_profile(month)
 	# 	# plot_argo_density_profile()

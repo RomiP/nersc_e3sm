@@ -87,10 +87,19 @@ def animate_e3sm_2d(runnum, index_var):
 	frames = []
 	titles = []
 	for d in tqdm(dates[:]):
+
 		if index_var in COMPONENTS['ocn']:
-			ds = get_mpaso_file_by_date(d.year, d.month, runtype + runnum, varname='timeSeriesStatsMonthlyMax')
+			if runnum == 'avg':
+				ds = get_ensemble_average(d.year, d.month, 'ocn', varname='timeSeriesStatsMonthlyMax')
+				ds = ds.mean(dim='runname', skipna=True)
+			else:
+				ds = get_mpaso_file_by_date(d.year, d.month, runtype + runnum, varname='timeSeriesStatsMonthlyMax')
 		elif index_var in COMPONENTS['ice']:
-			ds = get_mpassi_file_by_date(d.year, d.month, runtype + runnum)
+			if runnum == 'avg':
+				ds = get_ensemble_average(d.year, d.month, 'ice')
+				ds = ds.mean(dim='runname', skipna=True)
+			else:
+				ds = get_mpassi_file_by_date(d.year, d.month, runtype + runnum)
 		elif index_var in COMPONENTS['composites']:
 			pass
 		elif index_var in COMPONENTS['atm']:
@@ -165,6 +174,9 @@ def animate_e3sm_2d(runnum, index_var):
 
 
 if __name__ == '__main__':
-	enseble = ['0101', '0151', '0201', '0251', '0301', 'avg']
-	for i in enseble:
-		animate_e3sm_2d(i, 'maxMLD')
+	# enseble = ['0101', '0151', '0201', '0251', '0301', 'avg']
+	# for i in enseble:
+	# 	animate_e3sm_2d(i, 'maxMLD')
+
+	print('sic')
+	animate_e3sm_2d('avg', 'sic')
