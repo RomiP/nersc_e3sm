@@ -348,10 +348,10 @@ if __name__ == '__main__':
 	# for run in ['0101', '0151', '0201', '0251', '0301']:
 	# 	plot_mld_qnet_scatter(run)
 		# plot_mld_ts(run)
-	plot_E3SM_spatial_resolution()
+	# plot_E3SM_spatial_resolution()
 
-	# v = 'maxMLD'
-	# plot_climo(runnum='0201', varname=v, month=[1, 2, 3])
+	v = 'sic'
+	plot_climo(runnum='0201', varname=v, month=[1, 2, 3])
 	# plot_climo(runnum='avg', varname=v, month=[1, 2, 3])
 	# for month in [1, 2, 3]:
 	# 	# plot_e3sm_density_profile(month)
