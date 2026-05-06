@@ -34,6 +34,10 @@ VARNAMES = {
 	'sst':'timeMonthly_avg_seaSurfaceTemperature',
 	'sia':'timeMonthly_avg_iceAgeCell',
 	'siv':'timeMonthly_avg_iceVolumeCell',
+	'fsaledge':'timeMonthly_avg_activeTracerHorizontalAdvectionEdgeFlux_salinityHorizontalAdvectionEdgeFlux',
+	'ftempedge':'timeMonthly_avg_activeTracerHorizontalAdvectionEdgeFlux_temperatureHorizontalAdvectionEdgeFlux',
+	'vzonal':'timeMonthly_avg_velocityZonal',
+	'vmeridional':'timeMonthly_avg_velocityMeridional',
 }
 
 COMPONENTS = {'composites': ['qnet'],
@@ -240,6 +244,9 @@ def make_geopoly_from_contour(data, lon, lat, level):
 
 	return gdf
 
+def arg_nearest_geo(coord, lon, lat):
+	dist = (lon - coord[0]) ** 2 + (lat - coord[1]) ** 2
+	return int(np.argmin(dist))
 
 if __name__ == '__main__':
 

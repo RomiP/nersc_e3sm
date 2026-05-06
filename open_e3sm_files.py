@@ -85,8 +85,10 @@ def mpaso_mesh_latlon():
 	lonCell[lonCell > 180] -= 360
 	return latCell, lonCell, mesh.nCells.values
 
-def mpaso_depth():
-	mesh = xr.open_dataset(MESHFILE_OCN).sel(Time=0)
+def mpaso_depth(mesh=None):
+	if mesh is None:
+		mesh = xr.open_dataset(MESHFILE_OCN)
+	mesh.sel(Time=0)
 	layer = mesh.layerThickness
 	dz = layer.where(layer > 0).mean(dim='nCells', skipna=True).values
 	return np.cumsum(dz)
