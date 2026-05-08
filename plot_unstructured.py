@@ -1,16 +1,21 @@
 import bokeh.palettes
 import cartopy
 import cartopy.crs as ccrs
+import cartopy.feature as cfeature
+from cartopy.feature import ShapelyFeature
 import cartopy.mpl.ticker as ctk
+import cmasher as cmr
 import holoviews as hv
 import matplotlib
-import matplotlib.colors as cm
+import matplotlib.colors as mcolors
 from matplotlib.colors import TwoSlopeNorm, ListedColormap
 from matplotlib.ticker import FixedLocator
 import matplotlib.path as mpath
 import matplotlib.pyplot as plt
 import mosaic
 import numpy as np
+
+from helpers import make_mpas_polygon
 from open_e3sm_files import MESHFILE_OCN
 from scipy.interpolate import griddata
 import xarray as xr
@@ -49,7 +54,7 @@ def _init_proj(proj_name, **kwargs):
 	return projection
 
 
-def unstructured_pcolor(lat, lon, dat, **kwargs):
+def unstructured_pcolor(lat, lon, dat=None, **kwargs):
 	'''
 	Create pseudocolour plot from unstructured data either
 	by coloured scatter plot points or interpolating to a
@@ -71,7 +76,9 @@ def unstructured_pcolor(lat, lon, dat, **kwargs):
 		projname = str: name of map projection
 	:return: figure, axes
 	'''
-	fig = plt.figure(dpi=300)
+	# fig = plt.figure(dpi=300)
+	fig = plt.figure()
+	# ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
 
 	# set defaults
 	if not 'extent' in kwargs:
@@ -101,7 +108,7 @@ def unstructured_pcolor(lat, lon, dat, **kwargs):
 
 		if vmax is not None and vmin is not None:
 			rng = max(abs(vmax), abs(vmin))
-			norm = cm.Normalize(vmin=-rng + norm, vmax=rng + norm)
+			norm = mcolors.Normalize(vmin=-rng + norm, vmax=rng + norm)
 
 			# Truncate colormap
 			cmap_full = plt.colormaps[kwargs['cmap']]
@@ -120,12 +127,16 @@ def unstructured_pcolor(lat, lon, dat, **kwargs):
 	ax = fig.add_subplot(1, 1, 1, projection=my_proj)
 
 	if kwargs['landmask']:
-		ax.add_feature(cartopy.feature.NaturalEarthFeature(
-			'physical', 'land', '110m', facecolor='grey'), zorder=99)
+		ax.add_feature(cfeature.LAND, facecolor='grey', zorder=99)
+		# ax.add_feature(cartopy.feature.NaturalEarthFeature(
+		# 	'physical', 'land', '110m', facecolor='grey'), zorder=99)
 	else:
 		ax.coastlines()
 
-	if kwargs['interp']=='grid':
+	if dat is None:
+		ax.add_feature(cfeature.OCEAN)
+		colplot = None
+	elif kwargs['interp']=='grid':
 
 		step = 0.1
 		if 'res' in kwargs:
@@ -141,26 +152,28 @@ def unstructured_pcolor(lat, lon, dat, **kwargs):
 						   transform=ccrs.PlateCarree())
 	elif kwargs['interp']=='mosaic':
 		# todo: this expects dat to be dataArray with
-		if not 'dsMesh' in kwargs:
-			kwargs['dsMesh'] = xr.open_dataset(MESHFILE_OCN)
-			kwargs['dsMesh'].attrs['is_periodic'] = 'NO'
-		descriptor = mosaic.Descriptor(kwargs['dsMesh'], my_proj, ccrs.Geodetic(), use_latlon=True)
+		polys = make_mpas_polygon(kwargs['cellnums'])
+		# cmap = cmr.ocean.reversed()
+		cnorm = mcolors.Normalize(vmin=bath.min(), vmax=bath.max())
 
-		mosaic_arg = {}
-		if 'mosaic_edges' in kwargs and kwargs['mosaic_edges']:
-			mosaic_arg['edgecolors'] = 'grey'
-			mosaic_arg['antialiaseds'] = True
-		else:
-			mosaic_arg['antialiaseds'] = False
+		# todo: use specified cmap
+		cmap = cmr.ocean.reversed()
+		feature = ShapelyFeature(
+			polys,
+			ccrs.PlateCarree(),
+			facecolor=cmap(cnorm(bath)),
+			edgecolor='none',
+			linewidth=1
+		)
 
-		colplot = mosaic.polypcolor(ax, descriptor, dat, cmap=kwargs['cmap'], norm=kwargs['norm'], **mosaic_arg)
-
+		ax.add_feature(feature)
 	else:
 		colplot = ax.scatter(lon, lat, c=dat,
 						s=kwargs['dotsize'], cmap=kwargs['cmap'], clim=kwargs['clim'],
 						norm=kwargs['norm'],
 						marker='o', transform=ccrs.PlateCarree())
 
+	# axes boundary
 	if kwargs['extenttype'] == 'tight':
 		xlim = [min(extent[:2]), max(extent[:2])]
 		ylim = [min(extent[2:]), max(extent[2:])]
@@ -176,15 +189,15 @@ def unstructured_pcolor(lat, lon, dat, **kwargs):
 		rect_in_target = proj_to_data.transform_path(rect)
 
 		ax.set_boundary(rect_in_target)
-
 	else:
-
 		# Set the extent of the map (longitude_min, longitude_max, latitude_min, latitude_max)
 		ax.set_extent(extent, crs=ccrs.PlateCarree())
 
-	cbar = plt.colorbar(colplot)
-	if 'clabel' in kwargs:
-		cbar.set_label(kwargs['clabel'])
+	# colourbar settings
+	if colplot is not None:
+		cbar = plt.colorbar(colplot)
+		if 'clabel' in kwargs:
+			cbar.set_label(kwargs['clabel'])
 
 	if 'title' in kwargs:
 		plt.title(kwargs['title'])
@@ -207,6 +220,18 @@ def unstructured_pcolor(lat, lon, dat, **kwargs):
 		gl.ylocator = ctk.LatitudeLocator(6)
 		gl.xformatter = ctk.LongitudeFormatter(zero_direction_label=True)
 		gl.yformatter = ctk.LatitudeFormatter()
+
+
+	# fig.canvas.draw()  # IMPORTANT: forces layout to be computed
+	#
+	# bbox = ax.get_position()
+	# aspect = bbox.height / bbox.width
+	#
+	# # Choose figure width, compute matching height
+	# fig_width = fig.get_size_inches()[0]
+	# fig_height = fig_width * aspect
+	#
+	# fig.set_size_inches(fig_width*1.5, fig_height, forward=True)
 
 	if 'sc_handle' in kwargs and kwargs['sc_handle']:
 		return fig, ax, colplot

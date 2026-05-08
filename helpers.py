@@ -10,10 +10,11 @@ from open_e3sm_files import get_climatology
 import shapely
 from shapely.geometry import Polygon, LineString
 from shapely.ops import unary_union, polygonize
+from tqdm import tqdm
 from typing import Union
 import xarray as xr
 
-from open_e3sm_files import mpaso_mesh_latlon
+from open_e3sm_files import mpaso_mesh_latlon, MESHFILE_OCN
 
 MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -248,6 +249,29 @@ def arg_nearest_geo(coord, lon, lat):
 	dist = (lon - coord[0]) ** 2 + (lat - coord[1]) ** 2
 	return int(np.argmin(dist))
 
-if __name__ == '__main__':
+def make_mpas_polygon(cellnums):
 
+	mesh = xr.open_dataset(MESHFILE_OCN).isel(Time=0)
+	lats, lons, ncells = mpaso_mesh_latlon()
+	vlat = np.degrees(mesh.latVertex.values)
+	vlon = np.degrees(mesh.lonVertex.values)
+	vlon[vlon > 180] -= 360
+	cellnums -= 1
+
+	polys = []
+	for cellnum in tqdm(cellnums):
+		cell = mesh.isel(nCells=cellnum)
+		verts = cell.verticesOnCell.values - 1
+		verts = verts[verts >= 0]
+
+		coords = np.array([vlon[verts], vlat[verts]])
+		polys.append(Polygon(coords.T))
+
+
+	return polys
+
+
+
+
+if __name__ == '__main__':
 	pass

@@ -1,14 +1,17 @@
 import cartopy
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
-import shapely
+import cmasher as cmr
 from cartopy.feature import ShapelyFeature
 import cartopy.mpl.ticker as ctk
 from geopy.distance import geodesic
 import heapq
+
+# from analysis.plot_geometric_features import extent
 from helpers import *
 import json
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 import shapely.geometry as geom
 import numpy as np
 from open_e3sm_files import *
@@ -17,26 +20,74 @@ import xarray as xr
 
 from shapely.geometry import LineString
 
+from plot_unstructured import unstructured_pcolor, _init_proj
+
+
 def plot_fluxgate(gate, mesh_lats, mesh_lons):
-	fig = plt.figure()
-	ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
 
 	minx, miny, maxx, maxy = gate.total_bounds
 	buffer = 1
-	ax.set_extent([minx - buffer, maxx + buffer, miny - buffer, maxy + buffer],
-				  crs=ccrs.PlateCarree())
+	extent = [minx - buffer, maxx + buffer, miny - buffer, maxy + buffer]
 
-	# Put a background image on for nice sea rendering.
-	ax.add_feature(cfeature.LAND)
-	ax.add_feature(cfeature.OCEAN)
-	ax.add_feature(cfeature.COASTLINE)
+	fig = plt.figure()
+	proj = _init_proj('LambertConformal', extent=extent)
+	ax = fig.add_subplot(1, 1, 1,
+						 projection=ccrs.PlateCarree(),
+						 )
+	ax.set_extent(extent, crs=ccrs.PlateCarree())
+
+	lat, lon, ncells = mpaso_mesh_latlon()
+	z = mpaso_depth()
+	buffer *= 1.1
+	idx = ((lon < maxx + buffer) & (lon > minx - buffer)
+		   & (lat > miny - buffer) & (lat < maxy + buffer))
+	mesh = xr.load_dataset(MESHFILE_OCN).isel(Time=0)
+	izmax = mesh.maxLevelCell.values[idx] - 1
+	bath = z[izmax]
+	lat = lat[idx]
+	lon = lon[idx]
+
+	cmap = cmr.ocean.reversed()
+	cnorm = mcolors.Normalize(vmin=bath.min(), vmax=bath.max())
+
+	polys = make_mpas_polygon(ncells[idx]+1)
+	feature = ShapelyFeature(
+		polys,
+		ccrs.PlateCarree(),
+		facecolor=cmap(cnorm(bath)),
+		edgecolor='none',
+		linewidth=1
+	)
+
+	ax.add_feature(feature)
+
+	# fig, ax = unstructured_pcolor(lat, lon,
+	# 							  # bath,
+	# 							  extent=extent,
+	# 							  projname='PlateCarree',
+	# 							  gridlines=True,
+	# 							  landmask=True,
+	# 							  # dotsize=100,
+	# 							  cmap=cmr.ocean.reversed(),)
+
+	# plt.scatter(lon, lat, c=bath, cmap=cmr.ocean.reversed(),
+	# 			s=80, alpha=0.5,
+	# 			transform=ccrs.PlateCarree())
+
+	# cbar = plt.colorbar()
+	# cbar.set_label('Bathymetry (m)')
+
+	# # Put a background image on for nice sea rendering.
+	ax.add_feature(cfeature.LAND, facecolor='grey')
 
 	geoms = gate.geometry.values
 
 	coords = np.array(geoms[0].coords)
-	feat = ShapelyFeature(geoms, ccrs.PlateCarree(), edgecolor='red', facecolor='none')
-
-	# 4. Add to cartopy
+	feat = ShapelyFeature(geoms, ccrs.PlateCarree(),
+						  edgecolor='red',
+						  facecolor='none',
+						  linewidth=1,)
+	# Add to cartopy
 	ax.add_feature(feat)
 
 	# plot normal vector
@@ -44,24 +95,22 @@ def plot_fluxgate(gate, mesh_lats, mesh_lons):
 	if all(norm) > 0:
 		norm = -norm
 	mid = np.mean(coords, axis=0)
-	ax.quiver(mid[0], mid[1], norm[0], norm[1], angles='xy', scale_units='xy',
-			  scale=0.5, color='r' , transform=ccrs.PlateCarree())
+	# ax.quiver(mid[0], mid[1], norm[0], norm[1], angles='xy', scale_units='xy',
+	# 		  scale=0.5, color='r' , transform=ccrs.PlateCarree())
+	ax.quiver(
+		np.array([mid[0]]), np.array([mid[1]]),
+		np.array([norm[0]]), np.array([norm[1]]),
+		angles='xy',
+		scale_units='xy',
+		scale=0.5,
+		linewidths=5,
+		color='r',
+		zorder=99,
+		transform=ccrs.PlateCarree()
+	)
 
-	# line = gate.geometry.values[0]
-	# coords = list(line.coords)
-	# ax.plot((coords[0][0], coords[1][0]), (coords[0][1], coords[1][1]), c='green', linewidth=1, transform=ccrs.Geodetic())
-
-	ax.scatter(mesh_lons, mesh_lats, c='k', marker='o', alpha=0.5,
+	ax.scatter(mesh_lons, mesh_lats, c='k', marker='o', alpha=0.5, zorder=98,
 			   transform=ccrs.PlateCarree())
-
-	gl = ax.gridlines(draw_labels=True, x_inline=False, y_inline=False, linestyle='dashed')
-	gl.top_labels = False
-	gl.right_labels = False
-	gl.rotate_labels = False
-	gl.xlocator = ctk.LongitudeLocator(4)
-	gl.ylocator = ctk.LatitudeLocator(6)
-	gl.xformatter = ctk.LongitudeFormatter(zero_direction_label=True)
-	gl.yformatter = ctk.LatitudeFormatter()
 
 	return fig, ax
 
@@ -257,10 +306,10 @@ if __name__ == '__main__':
 
 	# %% calculate and plot flux
 
-	flux = calculate_flux(1,gate_line, mask)
-	plot_flux(flux, gate_line, mask)
-
-	plt.show()
+	# flux = calculate_flux(1,gate_line, mask)
+	# plot_flux(flux, gate_line, mask)
+	#
+	# plt.show()
 
 	# %% Create mask and plot fluxgate
 
