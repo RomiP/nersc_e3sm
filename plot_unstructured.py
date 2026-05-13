@@ -7,6 +7,7 @@ import cartopy.mpl.ticker as ctk
 import cmasher as cmr
 import holoviews as hv
 import matplotlib
+import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 from matplotlib.colors import TwoSlopeNorm, ListedColormap
 from matplotlib.ticker import FixedLocator
@@ -22,10 +23,10 @@ import xarray as xr
 
 matplotlib.use('module://backend_interagg')
 
-class MidpointNormalize(cm.Normalize):
+class MidpointNormalize(mcolors.Normalize):
 	def __init__(self, vmin=None, vmax=None, midpoint=None, clip=False):
 		self.midpoint = midpoint
-		cm.Normalize.__init__(self, vmin, vmax, clip)
+		mcolors.Normalize.__init__(self, vmin, vmax, clip)
 
 	def __call__(self, value, clip=None):
 		# I'm ignoring masked values and all kinds of edge cases to make a
@@ -133,9 +134,10 @@ def unstructured_pcolor(lat, lon, dat=None, **kwargs):
 	else:
 		ax.coastlines()
 
+	colplot = None
 	if dat is None:
 		ax.add_feature(cfeature.OCEAN)
-		colplot = None
+
 	elif kwargs['interp']=='grid':
 
 		step = 0.1
@@ -153,20 +155,29 @@ def unstructured_pcolor(lat, lon, dat=None, **kwargs):
 	elif kwargs['interp']=='mosaic':
 		# todo: this expects dat to be dataArray with
 		polys = make_mpas_polygon(kwargs['cellnums'])
-		# cmap = cmr.ocean.reversed()
-		cnorm = mcolors.Normalize(vmin=bath.min(), vmax=bath.max())
 
-		# todo: use specified cmap
-		cmap = cmr.ocean.reversed()
+		if 'clim' in kwargs:
+			vmin, vmax = kwargs['clim']
+			cnorm = mcolors.Normalize(vmin=vmin, vmax=vmax)
+		else:
+			cnorm = mcolors.Normalize(vmin=dat.min(), vmax=dat.max())
+
+		if isinstance(kwargs['cmap'], str) and kwargs['cmap'] in plt.colormaps:
+			cmap = plt.colormaps[kwargs['cmap']]
+		else:
+			cmap = kwargs['cmap']
 		feature = ShapelyFeature(
 			polys,
 			ccrs.PlateCarree(),
-			facecolor=cmap(cnorm(bath)),
+			facecolor=cmap(cnorm(dat)),
 			edgecolor='none',
 			linewidth=1
 		)
 
 		ax.add_feature(feature)
+		colplot = cm.ScalarMappable(cmap=cmap, norm=cnorm)
+		colplot.set_array([])
+
 	else:
 		colplot = ax.scatter(lon, lat, c=dat,
 						s=kwargs['dotsize'], cmap=kwargs['cmap'], clim=kwargs['clim'],
@@ -195,7 +206,7 @@ def unstructured_pcolor(lat, lon, dat=None, **kwargs):
 
 	# colourbar settings
 	if colplot is not None:
-		cbar = plt.colorbar(colplot)
+		cbar = plt.colorbar(colplot, ax=ax)
 		if 'clabel' in kwargs:
 			cbar.set_label(kwargs['clabel'])
 
