@@ -1,12 +1,4 @@
-import numpy as np
-import os
-from tqdm import tqdm
-import xarray as xr
-
-MESHFILE_OCN = ('/global/cfs/cdirs/e3sm/inputdata/ocn/mpas-o/ARRM10to60E2r1/'
-				'mpaso.ARRM10to60E2r1.rstFrom1monthG-chrys.220802.nc')
-
-E3SM_SIM_PATH = '/global/cfs/cdirs/m1199/e3sm-arrm-simulations/'
+from bootstrap import *
 
 def get_arctic_ocn_region_mask(regions):
 	'''
@@ -88,12 +80,21 @@ def mpaso_mesh_latlon():
 def mpaso_depth(mesh=None):
 	if mesh is None:
 		mesh = xr.open_dataset(MESHFILE_OCN)
-	mesh.sel(Time=0)
+		mesh.sel(Time=0)
 	layer = mesh.layerThickness
 	dz = layer.where(layer > 0).mean(dim='nCells', skipna=True).values
 	return np.cumsum(dz)
 
+def zip_subset_by_time(dates, getfile, varnames, mask=None, **kwargs):
+	v = [VARNAMES[i] for i in varnames]
+	d = dates[0]
+	subset = getfile(d.year, d.month, **kwargs)[v]
 
+	for d in tqdm(dates[1:]):
+		data = getfile(d.year, d.month, **kwargs)[v]
+		subset = xr.concat([subset, data], dim='Time')
+
+	return subset
 
 
 def max_mld_ts_dir(runnum='0151'):
@@ -299,12 +300,15 @@ def get_ensemble_average(year, month, component, **kwargs):
 	return ds
 
 if __name__ == '__main__':
+	pass
 	# get_arctic_ocn_region_mask('Labrador Sea')
-	for i in range(12):
-		print(i + 1)
-		get_climatology('slp', i+1, 'historical', overwrite=True)
-	# mpaso_mesh_latlon()
+	# for i in range(12):
+	# 	print(i + 1)
+	# 	get_climatology('slp', i+1, 'historical', overwrite=True)
+	# # mpaso_mesh_latlon()
 
+
+	# %%
 	# f = xr.open_dataset('/global/cfs/cdirs/m1199/e3sm-arrm-simulations/E3SM-Arcticv2.1_historical0151/archive/ocn/hist/E3SM-Arcticv2.1_historical0151.mpaso.hist.am.timeSeriesStatsMonthlyMax.1960-01-01.nc')
 	# print()
 	# year = 1950

@@ -1,51 +1,9 @@
-import datetime as dt
-from dateutil.relativedelta import relativedelta
-import geopandas as gpd
-import json
-import matplotlib.pyplot as plt
-import numpy as np
-from mpl_toolkits.mplot3d.proj3d import transform
-
-from open_e3sm_files import get_climatology
-import shapely
-from shapely.geometry import Polygon, LineString
-from shapely.ops import unary_union, polygonize
-from tqdm import tqdm
 from typing import Union
-import xarray as xr
 
-from open_e3sm_files import mpaso_mesh_latlon, MESHFILE_OCN
+import numpy as np
 
-MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-
-VARNAMES = {
-	'maxMLD':'timeMonthlyMax_max_dThreshMLD',
-	'sal':'timeMonthly_avg_activeTracers_salinity',
-	'ocntemp':'timeMonthly_avg_activeTracers_temperature',
-	'dens':'timeMonthly_avg_density',
-	'bvfml':'timeMonthly_avg_bruntVaisalaFreqML',
-	'qlat':'timeMonthly_avg_latentHeatFlux',
-	'lwhfd':'timeMonthly_avg_longWaveHeatFluxDown',
-	'lwhfu':'timeMonthly_avg_longWaveHeatFluxUp',
-	'swhf':'timeMonthly_avg_shortWaveHeatFlux',
-	'qsens':'timeMonthly_avg_sensibleHeatFlux',
-	'sic':'timeMonthly_avg_iceAreaCell',
-	'isice':'timeMonthly_avg_icePresent',
-	'sssal':'timeMonthly_avg_seaSurfaceSalinity',
-	'sst':'timeMonthly_avg_seaSurfaceTemperature',
-	'sia':'timeMonthly_avg_iceAgeCell',
-	'siv':'timeMonthly_avg_iceVolumeCell',
-	'fsaledge':'timeMonthly_avg_activeTracerHorizontalAdvectionEdgeFlux_salinityHorizontalAdvectionEdgeFlux',
-	'ftempedge':'timeMonthly_avg_activeTracerHorizontalAdvectionEdgeFlux_temperatureHorizontalAdvectionEdgeFlux',
-	'vzonal':'timeMonthly_avg_velocityZonal',
-	'vmeridional':'timeMonthly_avg_velocityMeridional',
-}
-
-COMPONENTS = {'composites': ['qnet'],
-			   'atm':[],
-			   'ice':['sic', 'isice', 'sic', 'siv'],
-			   'ocn':['maxMLD', 'bvfml', 'lwhfd', 'lwhfu', 'swhf', 'qsens', 'qlat', 'sal', 'ocntemp']}
-
+from bootstrap import *
+from open_e3sm_files import *
 
 
 def rotate(l: Union[list, np.array], k: int) -> Union[list, np.array]:
@@ -245,12 +203,13 @@ def make_geopoly_from_contour(data, lon, lat, level):
 
 	return gdf
 
+
 def arg_nearest_geo(coord, lon, lat):
 	dist = (lon - coord[0]) ** 2 + (lat - coord[1]) ** 2
 	return int(np.argmin(dist))
 
-def make_mpas_polygon(cellnums):
 
+def make_mpas_polygon(cellnums):
 	mesh = xr.open_dataset(MESHFILE_OCN).isel(Time=0)
 	lats, lons, ncells = mpaso_mesh_latlon()
 	vlat = np.degrees(mesh.latVertex.values)
@@ -267,11 +226,65 @@ def make_mpas_polygon(cellnums):
 		coords = np.array([vlon[verts], vlat[verts]])
 		polys.append(Polygon(coords.T))
 
-
 	return polys
 
 
+def quadrant(v):
+	x, y = v[0], v[1]
+	conds = [
+		(x > 0) & (y > 0),  # Q1
+		(x < 0) & (y > 0),  # Q2
+		(x < 0) & (y < 0),  # Q3
+		(x > 0) & (y < 0)   # Q4
+	]
+	choices = [1, 2, 3, 4]
+	return np.select(conds, choices, default=0)  # 0 for axes/origin
 
+def rho(s,t,z=100, lat=45, lon=0):
+
+	p = gsw.p_from_z(-z, lat)
+
+	SA = gsw.SA_from_SP(s, p, lon, lat)
+	CT = gsw.CT_from_t(SA, t, p)
+
+	return gsw.rho(SA, CT, p)
+
+
+def rho_e3sm(data, cellmask=None, potentialdensity=100):
+	mesh = xr.open_dataset(MESHFILE_OCN).isel(Time=0)
+
+	if cellmask is not None:
+		cellmask = np.argwhere(cellmask).squeeze()
+		mesh = mesh.sel(nCells=cellmask)
+		data = data.sel(nCells=cellmask)
+
+	bathmask = mesh['layerThickness'].values > 0
+	n = bathmask.shape[0]
+
+	s = data[VARNAMES['sal']].values
+	t = data[VARNAMES['ocntemp']].values
+
+	bathmask = bathmask.reshape(s.shape)
+	s[~bathmask] = np.nan
+	t[~bathmask] = np.nan
+
+	lon = np.degrees(mesh.lonCell.values)
+	lon = np.repeat(lon, 80).reshape(s.shape)
+	lat = np.degrees(mesh.latCell.values)
+	lat = np.repeat(lat, 80).reshape(s.shape)
+
+	if not potentialdensity:
+		z = mpaso_depth(mesh)
+	else:
+		z = potentialdensity
+
+	zgrid = np.zeros_like(s) + z
+
+	return rho(s,t, zgrid, lat, lon).squeeze()
 
 if __name__ == '__main__':
 	pass
+	data = get_mpaso_file_by_date(1950, 1, 'historical0101')
+	mask = np.zeros(594836)
+	mask[::2] = 1
+	d = rho_e3sm(data, mask)
