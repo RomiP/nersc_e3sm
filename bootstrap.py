@@ -22,7 +22,7 @@ import json
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
-from mpl_toolkits.mplot3d.proj3d import transform
+from mpl_toolkits.mplot3d.proj3d import proj_transform
 
 import numpy as np
 

@@ -90,7 +90,7 @@ def zip_subset_by_time(dates, getfile, varnames, mask=None, **kwargs):
 	d = dates[0]
 	subset = getfile(d.year, d.month, **kwargs)[v]
 
-	for d in tqdm(dates[1:]):
+	for d in tqdm(dates[1:], total=len(dates), initial=1):
 		data = getfile(d.year, d.month, **kwargs)[v]
 		subset = xr.concat([subset, data], dim='Time')
 

@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from datashader.colors import viridis
-
 from bootstrap import *
 from open_e3sm_files import *
 from plot_unstructured import *
@@ -253,7 +252,7 @@ def calculate_flux(data, gateline, mask, scalearea=True, parallel=False, posquad
 
 	if scalearea:
 		coords = gateline.get_coordinates().values[:, ::-1]
-		gatelen = geodesic(coords[0], coords[1]).km
+		gatelen = geodesic(coords[0], coords[1]).km * 1000
 		n = np.sum(mask)
 		dx = gatelen / n
 		mesh = xr.open_dataset(MESHFILE_OCN).isel(Time=0)
@@ -302,7 +301,7 @@ def plot_flux(flux, gateline, mask, cmapname='coolwarm'):
 
 	return plt.gcf(), ax, cbar
 
-def plot_normal_velocity(data, runnum, **kwargs):
+def plot_normal_velocity(data, gate_line, mask, **kwargs):
 	# flux = 0
 	# for d in tqdm(dates):
 	# 	data = get_mpaso_file_by_date(d.year, d.month, runnum,
@@ -314,16 +313,20 @@ def plot_normal_velocity(data, runnum, **kwargs):
 	#
 	# flux /= len(dates)
 
-	flux = data.mean(dim='Time', skipna=True)
+	data = data.mean(dim='Time', skipna=True)
+	flux = calculate_flux(data, gate_line, mask, scalearea=True, posquad=[3,4]) * 1e-6 # Sv
 	fig, ax, cbar = plot_flux(flux, gate_line, mask)
 
+	print(f'Total flux: {np.nansum(flux)} Sv')
 
-	cbar.set_label('Along-gate Velocity ($m/s$)')
+
+	# cbar.set_label('Along-gate Velocity ($m/s$)')
+	cbar.set_label('Across-gate Transport (Sv)')
 	# Get the current color limits
-	plt.clim(-0.4, 0.4)
-	# vmin, vmax = plt.gci().get_clim()
-	# cmax = max(abs(vmin), abs(vmax))
-	# plt.clim(-cmax, cmax)
+	# plt.clim(-0.4, 0.4)
+	vmin, vmax = plt.gci().get_clim()
+	cmax = max(abs(vmin), abs(vmax))
+	plt.clim(-cmax, cmax)
 
 	# Add text at ends
 	plt.text(1.1, 1.02, "South West", va='bottom', ha='left', transform=ax.transAxes)
@@ -335,8 +338,8 @@ def plot_normal_velocity(data, runnum, **kwargs):
 	plt.text(0.01, 0, "To Labrador", va='bottom', ha='left', transform=ax.transAxes)
 	plt.text(0.99, 0, "To Fram", va='bottom', ha='right', transform=ax.transAxes)
 
-	plt.title(f'Denmark Strait Parallel Velocity ({dates[0].year} - {dates[-1].year})')
-	plt.savefig(f'figs/flux_gates/{fname}_parallelvelocity_{runnum}_y{dates[0].year}-{dates[-1].year}.png')
+	plt.title(f'Denmark Strait Normal Velocity ({dates[0].year} - {dates[-1].year})')
+	# plt.savefig(f'figs/flux_gates/{fname}_parallelvelocity_{runnum}_y{dates[0].year}-{dates[-1].year}.png')
 	plt.show()
 
 def plot_crosssection(data, runnum, varname, mask):
@@ -362,6 +365,56 @@ def plot_crosssection(data, runnum, varname, mask):
 	plt.show()
 
 
+def flux_index_dataset(gatename):
+	root = 'regional_masks/flux_gates/'
+	gate_line = gpd.read_file(root + gatename + '.geojson')
+	mesh_gate = json.load(open(root + gatename + '.json'))
+	mask = np.array(mesh_gate['mask']).astype(bool)
+
+	startdate = dt.datetime(1950, 1, 1)
+	enddate = dt.datetime(2015, 1, 1)
+	dates = make_monthly_date_list(startdate, enddate)
+	runs = ['historical0101', 'historical0151', 'historical0201', 'historical0251', 'historical0301']
+
+
+	ds = {}
+	for runname in runs:
+		print(runname)
+		flux = np.array([])
+		for year in range(startdate.year, enddate.year):
+			print(year)
+			dates_1year = make_monthly_date_list(
+				dt.datetime(year, 1,1), dt.datetime(year + 1, 1,1)
+			)
+			data = zip_subset_by_time(dates_1year, get_mpaso_file_by_date,
+									  varnames=['vzonal', 'vmeridional'],
+									  runname=runname)
+			flux = np.concat([flux, flux_ts(data, mask, gate_line)])
+
+
+		da = xr.DataArray(flux.reshape(-1, 1), dims=('Time', 'runname'), coords={'Time': dates, 'runname': [runname]},
+						  name='flowrate')
+		ds[runname] = da
+
+	da = xr.concat(ds.values(), dim='runname')
+
+	ds = xr.Dataset({'flowrate': da})
+	ds.attrs['units'] = 'sverdrup'
+	ds.attrs['description'] = f'Flowrate in sverdrups across the Denmark Strait sill'
+
+	ds.to_netcdf(f'/global/cfs/cdirs/m1199/romina/data/timeseries/flowrate_{gatename}_ts_historical.nc', mode='a')
+
+def flux_ts(data, gatemask, gateline, depth=None):
+	if depth is None:
+		mesh = xr.open_dataset(MESHFILE_OCN).isel(Time=0)
+		depth = mesh.layerThickness.values[gatemask, :] > 0
+		depth = depth.T
+
+	flux = []
+	for i in range(len(data.Time.values)):
+		flow_rate = calculate_flux(data.isel(Time=i), gateline, gatemask, posquad=[3,4])
+		flux.append(np.sum(flow_rate[depth])*1e-6)
+	return np.array(flux)
 
 def plot_TS_diagram(data, runnum, depth, mask):
 	data = data.mean(dim='Time')
@@ -396,8 +449,10 @@ def plot_TS_diagram(data, runnum, depth, mask):
 	plt.ylabel('Temperature ($^\circ$C)')
 	plt.show()
 
+# 	todo: add freezing point to TS diagram
+
 if __name__ == '__main__':
-	print('')
+	print('10')
 
 	root = 'regional_masks/flux_gates/'
 	fname = 'denmark_strait_sill'
@@ -414,14 +469,20 @@ if __name__ == '__main__':
 	par = True
 	# %% calculate and plot flux
 	runnum = 'historical0101'
-	dates = make_monthly_date_list(dt.datetime(1950,11,1),
+	dates = make_monthly_date_list(dt.datetime(1950,1,1),
 								   dt.datetime(1951,1,1))
-	# data = zip_subset_by_time(dates, get_mpaso_file_by_date, ['sal', 'ocntemp', 'dens'], runname=runnum)
-	data = get_mpaso_file_by_date(1950, 1, runnum)
-	plot_TS_diagram(data, runnum, 100, mask)
+	data = zip_subset_by_time(dates, get_mpaso_file_by_date,
+							  # varnames=['vzonal', 'vmeridional'],
+							  varnames=['sal', 'ocntemp', 'dens'],
+							  runname=runnum)
+	# data = get_mpaso_file_by_date(1950, 1, runnum)
+	# plot_TS_diagram(data, runnum, 100, mask)
 	# plot_normal_velocity(dates, runnum)
 	# plot_crosssection(data, runnum, 'dens', mask)
-	# plot_normal_velocity(data, runnum)
+	# plot_normal_velocity(data, gate_line, mask)
+
+	# flux_ts(data, mask, gate_line)
+	flux_index_dataset(fname)
 
 	# ystep = 10
 	# for runnum in ['historical0101', 'historical0151', 'historical0201', 'historical0251', 'historical0301']:
