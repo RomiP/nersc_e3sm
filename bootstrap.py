@@ -30,7 +30,7 @@ import os
 
 from pyproj import Geod
 
-# import shapely
+import shapely
 import shapely.geometry as geom
 from shapely.geometry import Polygon, LineString
 from shapely.ops import unary_union, polygonize

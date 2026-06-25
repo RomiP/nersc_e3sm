@@ -264,14 +264,18 @@ def rho_e3sm(data, cellmask=None, potentialdensity=100):
 	s = data[VARNAMES['sal']].values
 	t = data[VARNAMES['ocntemp']].values
 
-	bathmask = bathmask.reshape(s.shape)
-	s[~bathmask] = np.nan
-	t[~bathmask] = np.nan
+	bathmask = bathmask.reshape(s.shape[-2:])
+	if 'Time' in data:
+		s[:, ~bathmask] = np.nan
+		t[:, ~bathmask] = np.nan
+	else:
+		s[~bathmask] = np.nan
+		t[~bathmask] = np.nan
 
 	lon = np.degrees(mesh.lonCell.values)
-	lon = np.repeat(lon, 80).reshape(s.shape)
+	lon = np.repeat(lon, 80).reshape(s.shape[-2:])
 	lat = np.degrees(mesh.latCell.values)
-	lat = np.repeat(lat, 80).reshape(s.shape)
+	lat = np.repeat(lat, 80).reshape(s.shape[-2:])
 
 	if not potentialdensity:
 		z = mpaso_depth(mesh)
@@ -282,9 +286,35 @@ def rho_e3sm(data, cellmask=None, potentialdensity=100):
 
 	return rho(s,t, zgrid, lat, lon).squeeze()
 
+def N2_e3sm(data, cellmask=None):
+
+	rho = rho_e3sm(data, cellmask)
+	zdim = len(rho.shape) - 1
+	drho = np.diff(rho, axis=zdim)
+
+	mesh = xr.open_dataset(MESHFILE_OCN).isel(Time=0)
+
+	if cellmask is not None:
+		cellmask = np.argwhere(cellmask).squeeze()
+		mesh = mesh.sel(nCells=cellmask)
+	dz = mesh['layerThickness'].values[:,:-1]
+	dz = np.broadcast_to(dz, drho.shape)
+
+
+
+	N2 = g /rho[...,:-1] * (drho / dz)
+
+
 if __name__ == '__main__':
 	pass
-	data = get_mpaso_file_by_date(1950, 1, 'historical0101')
+	# data = get_mpaso_file_by_date(1950, 1, 'historical0101')
+	data = zip_subset_by_time(make_monthly_date_list(dt.datetime(1950, 1, 1),
+													 dt.datetime(1950, 4, 1)),
+							  get_mpaso_file_by_date,
+							  runname='historical0101',
+							  varnames=['sal', 'ocntemp'],
+							  )
 	mask = np.zeros(594836)
 	mask[::2] = 1
-	d = rho_e3sm(data, mask)
+	# d = rho_e3sm(data, mask)
+	n2 = N2_e3sm(data, mask)
