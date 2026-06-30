@@ -75,25 +75,25 @@ def plot_fluxgate(gate, mesh_lats, mesh_lons, parallel=False, posquad=None):
 						  linewidth=1,)
 	ax.add_feature(feat)
 
-	# plot normal vector
-	norm = normal_vector(gate, parallel)
-	if posquad is not None:
-		quad = quadrant(norm)
-		if not quad in posquad:
-			norm = - norm
-	mid = np.mean(coords, axis=0)
-	print('quiver')
-	ax.quiver(
-		np.array([mid[0]]), np.array([mid[1]]),
-		np.array([norm[0]]), np.array([norm[1]]),
-		angles='xy',
-		scale_units='inches',
-		scale=1.25,
-		linewidths=5,
-		color='r',
-		zorder=99,
-		transform=ccrs.PlateCarree()
-	)
+	# # plot normal vector
+	# norm = normal_vector(gate, parallel)
+	# if posquad is not None:
+	# 	quad = quadrant(norm)
+	# 	if not quad in posquad:
+	# 		norm = - norm
+	# mid = np.mean(coords, axis=0)
+	# print('quiver')
+	# ax.quiver(
+	# 	np.array([mid[0]]), np.array([mid[1]]),
+	# 	np.array([norm[0]]), np.array([norm[1]]),
+	# 	angles='xy',
+	# 	scale_units='inches',
+	# 	scale=1.25,
+	# 	linewidths=5,
+	# 	color='r',
+	# 	zorder=99,
+	# 	transform=ccrs.PlateCarree()
+	# )
 
 	# plot the cells that make up the flux gate
 	print('scatter')
@@ -228,7 +228,10 @@ def normal_vector(line, parallel=True):
 	# line = line.geometry.values[0]
 	# coords = list(line.coords)
 
-	coords = line.geometry.get_coordinates().values
+	if isinstance(line, list) or isinstance(line, tuple):
+		coords = line
+	else:
+		coords = line.get_coordinates().values
 
 
 	dx = coords[1][0] - coords[0][0]
@@ -247,8 +250,6 @@ def calculate_flux(data, gateline, mask, scalearea=True, parallel=False, posquad
 
 	u = data[VARNAMES['vzonal']].values[mask,:]
 	v = data[VARNAMES['vmeridional']].values[mask,:]
-
-
 
 	norm = normal_vector(gateline.boundary, parallel)
 
@@ -271,22 +272,42 @@ def calculate_flux(data, gateline, mask, scalearea=True, parallel=False, posquad
 
 	return flux.T
 
-def calculate_flux_polygon(data, polygon, mask):
+def calculate_flux_polygon(data, polygon, mask, scalearea=True):
 	u = data[VARNAMES['vzonal']]
 	v = data[VARNAMES['vmeridional']]
 
 	lat, lon, ncells = mpaso_mesh_latlon()
 	gridcells = np.argwhere(mask).squeeze()
 	coords = polygon.get_coordinates().values
-	centre = polygon.centroid
+	centre = polygon.centroid.get_coordinates().values.squeeze()
 
+	flux = []
 	for i in gridcells:
-		tail = shapely.Point(lon[i], lat[i])
-		norm = normal_vector(shapely.LineString([tail, centre]))
+		tail = np.array([lon[i], lat[i]])
+		norm = normal_vector([tail, centre])
+		flux.append(u[i,:].values * norm[0] + v[i,:].values * norm[1])
+
+	coords = np.array([lon[gridcells], lat[gridcells]]).T
+	angles = np.arctan2(coords[:, 1] - centre[1], coords[:, 0] - centre[0])
+	ccw_indices = np.argsort(angles).squeeze()
+
+	flux = np.array(flux)
+	flux = flux[ccw_indices]
+
+	coords = coords[ccw_indices]
 
 
+	if scalearea:
+		mesh = xr.open_dataset(MESHFILE_OCN).isel(Time=0)
+		coords = np.append(coords, [coords[0]], axis=0)
+		dx = np.array([geodesic(coords[i], coords[i + 1]).m for i in range(len(coords) - 1)])
+		dx = np.repeat([dx], 80, axis=0).T
+		dz = mesh.layerThickness.values[mask, :]
+		da = dx * dz
+		flux *= da
+		coords = coords[:-1]
 
-
+	return flux.T, coords
 
 def plot_flux(flux, gateline, mask, cmapname='coolwarm'):
 
@@ -414,6 +435,8 @@ def flux_index_dataset(gatename, posquad=[1,2]):
 			data = zip_subset_by_time(dates_1year, get_mpaso_file_by_date,
 									  varnames=['vzonal', 'vmeridional'],
 									  runname=runname)
+
+			ts = flux_ts(data, mask, gate_line)
 			flux = np.concat([flux, flux_ts(data, mask, gate_line, posquad=posquad)])
 
 
@@ -449,8 +472,8 @@ def flux_index_dataset(gatename, posquad=[1,2]):
 		else:
 			print("Creating new file...")
 			ds_new.attrs['units'] = 'sverdrup'
-			ds_new.attrs['positive_quadramts'] = posquad,
-			ds_new.attrs['description'] = 'Flowrate in sverdrups across OSNAP West Greenland boundary current'
+			ds_new.attrs['positive_direction'] = 'inward',
+			ds_new.attrs['description'] = 'Volume transport into the central labrador sea'
 			ds_new.to_netcdf(outfile)
 
 def flux_ts(data, gatemask, gateline, depth=None, posquad=None):
@@ -462,11 +485,13 @@ def flux_ts(data, gatemask, gateline, depth=None, posquad=None):
 	flux = []
 	for i in range(len(data.Time.values)):
 		if all(gateline.geom_type == 'Polygon'):
-			flow_rate = calculate_flux_polygon(data.isel(Time=i), gateline, gatemask)
+			flow_rate, coords = calculate_flux_polygon(data.isel(Time=i), gateline, gatemask)
 		else:
 			flow_rate = calculate_flux(data.isel(Time=i), gateline, gatemask, posquad=posquad)
-		flux.append(np.sum(flow_rate[depth])*1e-6)
-	return np.array(flux)
+		flux.append(np.nansum(flow_rate[depth])*1e-6)
+
+	flux = np.array(flux)
+	return flux
 
 def plot_TS_diagram(data, runnum, depth, mask):
 	data = data.mean(dim='Time')
@@ -504,10 +529,10 @@ def plot_TS_diagram(data, runnum, depth, mask):
 # 	todo: add freezing point to TS diagram
 
 if __name__ == '__main__':
-	print('17')
+	print('2')
 
 	root = 'regional_masks/flux_gates/'
-	fname = 'model_dczone'
+	fname = 'osnap_west_LS'
 	gate_line = gpd.read_file(root + fname + '.geojson')
 	if not os.path.exists(root + fname + '.json'):
 		import heapq
@@ -523,24 +548,24 @@ if __name__ == '__main__':
 
 
 	# %% calculate and plot flux
-	runnum = 'historical0101'
-	dates = make_monthly_date_list(dt.datetime(1950,1,1),
-								   dt.datetime(1950,3,1))
-	# data = zip_subset_by_time(dates, get_mpaso_file_by_date,
-	# 						  varnames=['vzonal', 'vmeridional'],
-	# 						  # varnames=['sal', 'ocntemp', 'dens'],
-	# 						  runname=runnum)
-	data = get_mpaso_file_by_date(1950, 1, runnum)
-	# plot_TS_diagram(data, runnum, 100, mask)
-	# plot_normal_velocity(dates, runnum)
-	# plot_crosssection(data, runnum, 'dens', mask)
-	# plot_normal_velocity(data, gate_line, mask,
-	# 					 title=f'GWBC Transport {runnum} ({dates[0].year} - {dates[-1].year})',
-	# 					 saveas=f'figs/flux_gates/{fname}_transport_{runnum}_{dates[0].year}-{dates[-1].year}.png'
-	# 					 )
+	# runnum = 'historical0101'
+	# dates = make_monthly_date_list(dt.datetime(1950,1,1),
+	# 							   dt.datetime(1950,3,1))
+	# # data = zip_subset_by_time(dates, get_mpaso_file_by_date,
+	# # 						  varnames=['vzonal', 'vmeridional'],
+	# # 						  # varnames=['sal', 'ocntemp', 'dens'],
+	# # 						  runname=runnum)
+	# data = get_mpaso_file_by_date(1950, 1, runnum)
+	# # plot_TS_diagram(data, runnum, 100, mask)
+	# # plot_normal_velocity(dates, runnum)
+	# # plot_crosssection(data, runnum, 'dens', mask)
+	# # plot_normal_velocity(data, gate_line, mask,
+	# # 					 title=f'GWBC Transport {runnum} ({dates[0].year} - {dates[-1].year})',
+	# # 					 saveas=f'figs/flux_gates/{fname}_transport_{runnum}_{dates[0].year}-{dates[-1].year}.png'
+	# # 					 )
 
-	flux_ts(data, mask, gate_line)
-	# flux_index_dataset('denmark_strait_sill')
+	# flux_ts(data, mask, gate_line)
+	# flux_index_dataset('model_dczone')
 
 	# ystep = 10
 	# for runnum in ['historical0101', 'historical0151', 'historical0201', 'historical0251', 'historical0301']:
@@ -562,11 +587,11 @@ if __name__ == '__main__':
 
 	# %% Create mask and plot fluxgate
 
-	# lat, lon, ncells = mpaso_mesh_latlon()
-	# gate_lats = lat[mask]
-	# gate_lons = lon[mask]
-	#
-	# plot_fluxgate(gate_line, gate_lats, gate_lons,
-	# 			  parallel=par, posquad=positive_quadrant)
-	#
-	# plt.show()
+	lat, lon, ncells = mpaso_mesh_latlon()
+	gate_lats = lat[mask]
+	gate_lons = lon[mask]
+
+	plot_fluxgate(gate_line, gate_lats, gate_lons,
+				  parallel=par, posquad=positive_quadrant)
+
+	plt.show()

@@ -1,3 +1,5 @@
+from cProfile import label
+
 import cartopy.crs as ccrs
 import geopandas as gpd
 from helpers import *
@@ -412,6 +414,35 @@ def putz_w_labsea_dcmask():
 
 	plt.savefig('figs/LabSea_DCMask.png')
 	plt.show()
+
+def plot_transport_ts(gatename):
+
+
+	data_root = '/global/cfs/cdirs/m1199/romina/data/timeseries/'
+	fname = data_root + f'flowrate_{gatename}_ts_historical.nc'
+
+	ds = xr.load_dataset(fname)
+
+
+	data = ds.resample(Time="YS").mean()
+	plt.title(f'Transport across {gatename} (yearly mean)')
+
+
+	# data = ds.groupby("Time.month").mean(dim="Time")
+	# data = data.assign_coords(month=MONTHS)
+	# data = data.rename({'month':'Time'})
+	# plt.title(f'Transport across {gatename} (monthly climo)')
+
+
+	for i in range(len(data['runname'])):
+		plt.plot(data['Time'], data['flowrate'].isel(runname=i),
+				 label=data['runname'][i].values, alpha=1)
+
+	plt.ylabel('Transport (Sv)')
+	plt.legend()
+	plt.show()
+
+
 if __name__ == '__main__':
 	# supported values are ['gtk3agg', 'gtk3cairo', 'gtk4agg', 'gtk4cairo', 'macosx', 'nbagg', 'notebook', 'qtagg',
 	# 'qtcairo', 'qt5agg', 'qt5cairo', 'tkagg', 'tkcairo', 'webagg', 'wx', 'wxagg', 'wxcairo', 'agg', 'cairo', 'pdf',
@@ -419,7 +450,9 @@ if __name__ == '__main__':
 	matplotlib.use('module://backend_interagg')
 	# print(matplotlib.get_backend())
 
-	putz_w_labsea_dcmask()
+	# putz_w_labsea_dcmask()
+
+	plot_transport_ts('osnap_west_LS')
 
 	# unstructured_pcolor(0,0,0)
 	# open_some_data()
@@ -444,18 +477,18 @@ if __name__ == '__main__':
 	# 	title=' Oct-Mar',
 	# )
 
-	field = 'maxMLD'
-	plotargs = dict(
-		projname='Miller',
-		extent=[-70, -30, 50, 70],
-		clim=[0, 3000],
-		cmap='turbo',
-		clabel='Max MLD (m)',
-		# extenttype='tight',
-		dotsize=1,
-		gridlines=True,
-		title=' Oct-Mar',
-	)
+	# field = 'maxMLD'
+	# plotargs = dict(
+	# 	projname='Miller',
+	# 	extent=[-70, -30, 50, 70],
+	# 	clim=[0, 3000],
+	# 	cmap='turbo',
+	# 	clabel='Max MLD (m)',
+	# 	# extenttype='tight',
+	# 	dotsize=1,
+	# 	gridlines=True,
+	# 	title=' Oct-Mar',
+	# )
 
 	# field = 'sic'
 	# plotargs = dict(
