@@ -68,8 +68,9 @@ def get_nearest_coord_idx(lons, lats, targetcoord):
 	idx = np.argmin(np.linalg.norm(coords - targetcoord, axis=1))
 	return int(idx)
 
-def mpaso_mesh_latlon():
-	mesh = xr.open_dataset(MESHFILE_OCN)
+def mpaso_mesh_latlon(mesh=None):
+	if mesh is None:
+		mesh = xr.open_dataset(MESHFILE_OCN)
 	lonCell = mesh.lonCell.values
 	latCell = mesh.latCell.values
 	lonCell = 180 / np.pi * lonCell

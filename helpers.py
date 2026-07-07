@@ -1,5 +1,6 @@
 from typing import Union
 
+import gsw
 import numpy as np
 
 from bootstrap import *
@@ -286,23 +287,31 @@ def rho_e3sm(data, cellmask=None, potentialdensity=100):
 
 	return rho(s,t, zgrid, lat, lon).squeeze()
 
-def N2_e3sm(data, cellmask=None):
+def N2_e3sm(data, cellmask=None, mesh=None, lons=None, lats=None):
 
 	rho = rho_e3sm(data, cellmask)
 	zdim = len(rho.shape) - 1
 	drho = np.diff(rho, axis=zdim)
 
-	mesh = xr.open_dataset(MESHFILE_OCN).isel(Time=0)
+	if mesh is None:
+		mesh = xr.open_dataset(MESHFILE_OCN).isel(Time=0)
 
 	if cellmask is not None:
 		cellmask = np.argwhere(cellmask).squeeze()
 		mesh = mesh.sel(nCells=cellmask)
-	dz = mesh['layerThickness'].values[:,:-1]
-	dz = np.broadcast_to(dz, drho.shape)
+
+	if lons is None or lats is None:
+		lons, lats, cellnum = mpaso_mesh_latlon(mesh)
+
+	# dz = mesh['layerThickness'].values[:,:-1]
+	# dz = np.broadcast_to(dz, drho.shape)
+
+	# N2 = g /rho[...,:-1] * (drho / dz)
+	sal = gsw.SA_from_SP(data[VARNAMES['sal']], data[VARNAMES['pres']], )
+	gsw.SA_from_SP()
 
 
-
-	N2 = g /rho[...,:-1] * (drho / dz)
+	return N2
 
 
 if __name__ == '__main__':

@@ -74,14 +74,30 @@ def extract_ts_from_composite_file():
 	dat.to_netcdf(f'/global/cfs/projectdirs/m1199/romina/data/timeseries/netHeatFlux_LabSeaDC_{type}.nc')
 
 
-def regionally_averaged_ts(runname, startdate, enddate, fieldname):
-	lat, lon, ncell = mpaso_mesh_latlon()
+def regionally_averaged_ts(runname, startdate, enddate, fieldnames, mask=None, mesh=None):
+	if mesh is None:
+		mesh = xr.open_dataset(MESHFILE_OCN)
 
-	poly_file = 'regional_masks/model_dczone.geojson'
-	my_json = open(poly_file).read()
-	mask = geopolygon_mask(my_json, lon, lat)
+	if mask is None:
+		poly_file = 'regional_masks/model_dczone.geojson'
+		my_json = open(poly_file).read()
+		lat, lon, _ = mpaso_mesh_latlon(mesh)
+		mask = geopolygon_mask(my_json, lon, lat)
+	elif isinstance(mask, str) and mask.endswith('.geojson'):
+		my_json = open(mask).read()
+		lat, lon, _ = mpaso_mesh_latlon(mesh)
+		mask = geopolygon_mask(my_json, lon, lat)
+	elif isinstance(mask, str) and mask.endswith('.json'):
+		mask = json.load(open(mask))
+		mask = np.array(mask['mask']).astype(bool)
+	imask = np.argwhere(mask).squeeze()
 
-	varname = VARNAMES[fieldname]
+
+	mesh = mesh.isel(Time=0, nCells=imask)
+	z = mpaso_depth(mesh)
+	dz_mask = mesh['layerThickness'].values > 0
+	izmax = np.argwhere(np.isnan(z)).squeeze()[0]
+	dz_mask = dz_mask[:, :izmax]
 
 	dates = []
 	while startdate < enddate:
@@ -94,7 +110,8 @@ def regionally_averaged_ts(runname, startdate, enddate, fieldname):
 		startdate += relativedelta(months=1)
 
 
-	ts = []
+	regional_dat = {f:[] for f in fieldnames}
+
 	for date in tqdm(dates):
 		# fname = f'E3SM-Arcticv2.1_{runname}.mpaso.hist.am.timeSeriesStatsMonthlyMax.{date.strftime("%Y-%m-%d")}.nc'
 		# modeldat = xr.open_dataset(fileroot + fname, engine='netcdf4')
@@ -105,24 +122,45 @@ def regionally_averaged_ts(runname, startdate, enddate, fieldname):
 					 f'dThreshMLD.E3SMv2.1B60to10rA02.mpaso.hist.am.timeSeriesStatsMonthlyMax.{date.year:04}-{date.month:02}-01.nc')
 			modeldat = xr.open_dataset(fname)
 		else:
-			if fieldname in COMPONENTS['ocn']:
+			if fieldnames[0] in COMPONENTS['ocn']:
 				modeldat = get_mpaso_file_by_date(date.year, date.month, runname)
-			elif fieldname in COMPONENTS['ice']:
+			elif fieldnames[0] in COMPONENTS['ice']:
 				modeldat = get_mpassi_file_by_date(date.year, date.month, runname)
-			elif fieldname in COMPONENTS['atm']:
+			elif fieldnames[0] in COMPONENTS['atm']:
 				modeldat = get_atmo_file_by_date(date.year, date.month, runname)
 			else:
 				raise NotImplementedError
 
+		modeldat = modeldat.isel(nCells=imask, Time=0)
+		modeldat = modeldat.sel(nVertLevels=slice(0, izmax))
+
+		for field in fieldnames:
+			varname = VARNAMES[field]
+			singlevar = modeldat[varname]
+
+			if singlevar.ndim == 2:
+				singlevar.data[~dz_mask] = np.nan
+
+			regional_dat[field].append(singlevar.mean(dim='nCells', skipna=True))
 
 		# modeldat = modeldat.sel(nCells=ncell)
-		modeldat = modeldat[varname].data.squeeze()[mask]
-		ts.append(np.mean(modeldat))
+	# 	modeldat = modeldat[varname].data.squeeze()[mask]
+	# 	ts.append(np.mean(modeldat))
+	#
+	#
+	# ts = np.array(ts)
+	# dates = np.array(dates)
+	#
+	# return dates, ts
 
+	for field in fieldnames:
+		regional_dat[field] = xr.concat(regional_dat[field], dim='Time')
+		regional_dat[field].attrs = modeldat[VARNAMES[field]].attrs
+		if 'nVertLevels' in regional_dat[field].dims:
+			regional_dat[field] = regional_dat[field].rename({'nVertLevels':'depth'})
+			regional_dat[field] = regional_dat[field].assign_coords(depth=z[:izmax])
 
-	ts = np.array(ts)
-	dates = np.array(dates)
-	return dates, ts
+	return regional_dat
 
 def make_regionalavg_ts_dataset(fieldname, units):
 	# startdate = dt.datetime(1, 1, 1)
@@ -137,25 +175,88 @@ def make_regionalavg_ts_dataset(fieldname, units):
 	# enddate = dt.datetime(2097, 1, 1)
 	# runs = ['ssp370_0101', 'ssp370_0201']
 
-
-	ds = {}
+	outfile = f'/global/cfs/cdirs/m1199/romina/data/timeseries/{fieldname}_dcmean_ts_historical.nc'
+	# ds = {}
 	for runname in runs:
 		print(runname)
 		dates, field = regionally_averaged_ts(runname, startdate, enddate, fieldname)
 		# dates2, field2 = regionally_averaged_ts(runname, startdate, enddate, fieldname+'u')
 		# field+=field2
 
-		da = xr.DataArray(field.reshape(-1, 1), dims=('time', 'runname'), coords={'time': dates, 'runname': [runname]},
+		da_new = xr.DataArray(field.reshape(-1, 1),
+						  dims=('Time', 'runname'),
+						  coords={'Time': dates, 'runname': [runname]},
 						  name=fieldname)
-		ds[runname] = da
 
-	da = xr.concat(ds.values(), dim='runname')
+		ds_new = xr.Dataset({fieldname: da_new})
 
-	ds = xr.Dataset({fieldname: da})
-	ds.attrs['units'] = units
-	ds.attrs['description'] = f'Labrador Sea {fieldname} mean over deep convection zone recorded over monthly time period.'
+		# --- Save / Append logic ---
+		if os.path.exists(outfile):
+			print("Appending to existing file...")
 
-	ds.to_netcdf(f'/global/cfs/cdirs/m1199/romina/data/timeseries/{fieldname}_dcmean_ts_historical.nc', mode='a')
+			with xr.open_dataset(outfile) as ds_existing:
+				ds_combined = xr.concat([ds_existing, ds_new], dim='runname')
+
+				# Combine along runname dimension
+				ds_combined = xr.concat([ds_existing, ds_new], dim='runname')
+
+				# Optional: remove duplicate runnames if rerunning
+				_, index = np.unique(ds_combined['runname'], return_index=True)
+				ds_combined = ds_combined.isel(runname=index)
+
+			ds_combined.to_netcdf(outfile, mode='w')
+
+		else:
+			print("Creating new file...")
+			ds_new.attrs['units'] = units
+			ds_new.attrs['description'] = f'Labrador Sea {fieldname} mean over deep convection zone recorded over monthly time period.'
+			ds_new.to_netcdf(outfile)
+
+
+def regional_avg_dataset(fieldnames, region):
+
+
+	startdate = dt.datetime(1950, 1, 1)
+	enddate = dt.datetime(2015, 1, 1)
+	runs = ['historical0101', 'historical0151', 'historical0201', 'historical0251', 'historical0301']
+	mesh = xr.open_dataset(MESHFILE_OCN)
+	for run in runs[2:]:
+		print(run)
+		all_fields = regionally_averaged_ts(run, startdate, enddate, fieldnames, mask=region, mesh=mesh)
+
+		for field in fieldnames:
+			outfile = f'/global/cfs/cdirs/m1199/romina/data/timeseries/{field}_{region.split("/")[-1].split(".")[0]}_ts_historical.nc'
+			ds_new = xr.Dataset({field: all_fields[field]}).assign_coords({'runname':[run]})
+
+
+			# --- Save / Append logic ---
+			if os.path.exists(outfile):
+				print("Appending to existing file...")
+
+				with xr.open_dataset(outfile) as ds_existing:
+					# ds_combined = xr.concat([ds_existing, ds_new], dim='runname')
+
+					# Combine along runname dimension
+					ds_combined = xr.concat([ds_existing, ds_new], dim='runname')
+
+					# Optional: remove duplicate runnames if rerunning
+					_, index = np.unique(ds_combined['runname'], return_index=True)
+					ds_combined = ds_combined.isel(runname=index)
+
+				ds_combined.to_netcdf(outfile, mode='w')
+
+			else:
+				print("Creating new file...")
+				# ds_new.attrs['units'] = units
+				# ds_new.attrs[
+				# 	'description'] = f'Labrador Sea {fieldname} mean over deep convection zone recorded over monthly time period.'
+				ds_new.to_netcdf(outfile)
+
+
+
+
+
+
 
 
 def make_CDT_prof_dataset(runnum):
@@ -198,10 +299,10 @@ if __name__ == '__main__':
 	# type = 'control'
 	# runs = ['control']
 
-	startdate = dt.datetime(1950, 1, 1)
-	enddate = dt.datetime(2015, 1, 1)
-	type = 'historical'
-	runs = ['historical0101', 'historical0151', 'historical0201', 'historical0251', 'historical0301']
+	# startdate = dt.datetime(1950, 1, 1)
+	# enddate = dt.datetime(2015, 1, 1)
+	# type = 'historical'
+	# runs = ['historical0101', 'historical0151', 'historical0201', 'historical0251', 'historical0301']
 
 	# startdate = dt.datetime(2015, 1, 1)
 	# enddate = dt.datetime(2097, 1, 1)
@@ -213,10 +314,11 @@ if __name__ == '__main__':
 	# make_qnet_field(startdate, enddate, runs, type)
 
 	# extract_ts_from_composite_file()
-
-	# make_regionalavg_ts_dataset('lwhfu', 'W/m^2')
-	for run in ['0101', '0151', '0251', '0301']:
-		make_CDT_prof_dataset(run)
+	print('1')
+	# make_regionalavg_ts_dataset('sal', 'PSU')
+	regional_avg_dataset(['sal', 'ocntemp', 'pdens', 'brn'], 'regional_masks/model_dczone.geojson')
+	# for run in ['0101', '0151', '0251', '0301']:
+	# 	make_CDT_prof_dataset(run)
 
 
 

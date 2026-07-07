@@ -9,7 +9,10 @@ VARNAMES = {
 	'sal': 'timeMonthly_avg_activeTracers_salinity',
 	'ocntemp': 'timeMonthly_avg_activeTracers_temperature',
 	'dens': 'timeMonthly_avg_density',
+	'pdens': 'timeMonthly_avg_potentialDensity',
 	'bvfml': 'timeMonthly_avg_bruntVaisalaFreqML',
+	'brn': 'timeMonthly_avg_bulkRichardsonNumber',
+	'bld': 'timeMonthly_avg_boundaryLayerDepth',
 	'qlat': 'timeMonthly_avg_latentHeatFlux',
 	'lwhfd': 'timeMonthly_avg_longWaveHeatFluxDown',
 	'lwhfu': 'timeMonthly_avg_longWaveHeatFluxUp',
@@ -30,7 +33,8 @@ VARNAMES = {
 COMPONENTS = {'composites': ['qnet'],
 			  'atm': [],
 			  'ice': ['sic', 'isice', 'sic', 'siv'],
-			  'ocn': ['maxMLD', 'bvfml', 'lwhfd', 'lwhfu', 'swhf', 'qsens', 'qlat', 'sal', 'ocntemp']}
+			  'ocn': ['maxMLD', 'bvfml', 'lwhfd', 'lwhfu', 'swhf', 'qsens', 'qlat', 'sal', 'ocntemp', 'pdens',
+					  'bvfml', 'brn', 'bld']}
 
 MESHFILE_OCN = ('/global/cfs/cdirs/e3sm/inputdata/ocn/mpas-o/ARRM10to60E2r1/'
 				'mpaso.ARRM10to60E2r1.rstFrom1monthG-chrys.220802.nc')

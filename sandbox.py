@@ -419,26 +419,27 @@ def plot_transport_ts(gatename):
 
 
 	data_root = '/global/cfs/cdirs/m1199/romina/data/timeseries/'
-	fname = data_root + f'flowrate_{gatename}_ts_historical.nc'
+	# fname = data_root + f'flowrate_{gatename}_ts_historical.nc'
+	fname = data_root + 'brn_dcmean_ts_historical.nc'
 
 	ds = xr.load_dataset(fname)
 
 
 	data = ds.resample(Time="YS").mean()
-	plt.title(f'Transport across {gatename} (yearly mean)')
+	# plt.title(f'{ds["description"]} (yearly mean)')
 
 
 	# data = ds.groupby("Time.month").mean(dim="Time")
 	# data = data.assign_coords(month=MONTHS)
 	# data = data.rename({'month':'Time'})
-	# plt.title(f'Transport across {gatename} (monthly climo)')
+	plt.title(f'Transport across {gatename} (monthly climo)')
 
 
 	for i in range(len(data['runname'])):
-		plt.plot(data['Time'], data['flowrate'].isel(runname=i),
+		plt.plot(data['Time'], data['brn'].isel(runname=i),
 				 label=data['runname'][i].values, alpha=1)
 
-	plt.ylabel('Transport (Sv)')
+	# plt.ylabel(f'{ds["description"]} ({ds["units"]})')
 	plt.legend()
 	plt.show()
 

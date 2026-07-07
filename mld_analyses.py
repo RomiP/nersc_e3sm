@@ -676,7 +676,82 @@ def plot_climo_profile(runnum, month):
 	plt.savefig(f'figs/LabSea_density_upper1km_m{month:02}_{runnum}.png')
 	plt.show()
 
+def make_N2_ts_dataset():
+	root = 'regional_masks/flux_gates/'
+	gatename = 'model_dczone'
+	outfile = f'/global/cfs/cdirs/m1199/romina/data/timeseries/N2_{gatename}_ts_historical.nc'
 
+
+	mesh = xr.open_dataset(MESHFILE_OCN).isel(Time=0)
+	lat, lon, ncells = mpaso_mesh_latlon(mesh)
+	mask = geopolygon_mask(f'regional_masks/{gatename}.geojson', lon, lat)
+	mask_idx = np.argwhere(mask).squeeze()
+	lat = lat[mask]
+	lon = lon[mask]
+	# mesh_masked = mesh.isel(ncCells=mask_idx)
+
+
+	startdate = dt.datetime(1950, 1, 1)
+	enddate = dt.datetime(2015, 1, 1)
+	dates = make_monthly_date_list(startdate, enddate)
+	runs = ['historical0101', 'historical0151', 'historical0201', 'historical0251', 'historical0301']
+
+	for runname in runs:
+		print(runname)
+		n2 = np.array([])
+		# for year in range(startdate.year, enddate.year):
+		# 	print(year)
+		# 	dates_1year = make_monthly_date_list(
+		# 		dt.datetime(year, 1, 1),
+		# 		dt.datetime(year + 1, 1, 1)
+		# 	)
+		# 	data = zip_subset_by_time(dates_1year, get_mpaso_file_by_date,
+		# 							  varnames=['vzonal', 'vmeridional'],
+		# 							  runname=runname)
+		#
+		# 	ts = flux_ts(data, mask, gate_line)
+		# 	flux = np.concat([flux, flux_ts(data, mask, gate_line, posquad=posquad)])
+
+		for date in tqdm(dates):
+			data = get_mpaso_file_by_date(date.year, date.month, runname)
+			data = data.isel(nCells=mask_idx)
+			n2, z = N2_e3sm(data, mesh, lats=lat, lons=lon)
+
+
+
+		# Create DataArray for this run
+		da_new = xr.DataArray(
+			flux.reshape(-1, 1),
+			dims=('Time', 'runname'),
+			coords={'Time': dates, 'runname': [runname]},
+			name='N2'
+		)
+
+		ds_new = xr.Dataset({'flowrate': da_new})
+
+		# --- Save / Append logic ---
+		if os.path.exists(outfile):
+			print("Appending to existing file...")
+
+			# ds_existing = xr.open_dataset(outfile)
+
+			with xr.open_dataset(outfile) as ds_existing:
+				ds_combined = xr.concat([ds_existing, ds_new], dim='runname')
+
+				# Combine along runname dimension
+				ds_combined = xr.concat([ds_existing, ds_new], dim='runname')
+
+				# Optional: remove duplicate runnames if rerunning
+				_, index = np.unique(ds_combined['runname'], return_index=True)
+				ds_combined = ds_combined.isel(runname=index)
+
+			ds_combined.to_netcdf(outfile, mode='w')
+
+		else:
+			print("Creating new file...")
+			ds_new.attrs['units'] = 's^-2'
+			ds_new.attrs['description'] = 'Buoyancy Frequency^2 in the labrador sea model deep convection zone'
+			ds_new.to_netcdf(outfile)
 
 if __name__ == '__main__':
 	enseble = ['0101', '0151', '0201', '0251', '0301', 'avg']
@@ -684,7 +759,7 @@ if __name__ == '__main__':
 	# 							   dt.datetime(2015, 1, 1))
 	# mask = get_arctic_ocn_region_mask('Labrador Sea')
 
-
+	make_N2_ts_dataset()
 
 	# plot_maxMLD_hist('historical0101',
 	# 				 dt.datetime(2012, 1, 1),
@@ -702,11 +777,11 @@ if __name__ == '__main__':
 
 	# plot_mld_vs_qnet_allmembers('historical')
 
-	for i in enseble[:-1]:
-		print(i)
-		# ocean_hovmoller('historical' + i)
-		for m in range(1, 13):
-			plot_climo_profile('historical' + i, m)
+	# for i in enseble[:-1]:
+	# 	print(i)
+	# 	# ocean_hovmoller('historical' + i)
+	# 	for m in range(1, 13):
+	# 		plot_climo_profile('historical' + i, m)
 	# # 	plot_mld_climo(i)
 	# # 	plot_mld_ts(i)
 	# 	plot_mld_vs_qnet(i, 'historical')
