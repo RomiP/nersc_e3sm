@@ -34,7 +34,7 @@ COMPONENTS = {'composites': ['qnet'],
 			  'atm': [],
 			  'ice': ['sic', 'isice', 'sic', 'siv'],
 			  'ocn': ['maxMLD', 'bvfml', 'lwhfd', 'lwhfu', 'swhf', 'qsens', 'qlat', 'sal', 'ocntemp', 'pdens',
-					  'bvfml', 'brn', 'bld']}
+					  'bvfml', 'brn', 'bld', 'vzonal', 'vmeridional']}
 
 MESHFILE_OCN = ('/global/cfs/cdirs/e3sm/inputdata/ocn/mpas-o/ARRM10to60E2r1/'
 				'mpaso.ARRM10to60E2r1.rstFrom1monthG-chrys.220802.nc')

@@ -1,7 +1,8 @@
-from cProfile import label
+# from cProfile import label
+#
+# import cartopy.crs as ccrs
+# import geopandas as gpd
 
-import cartopy.crs as ccrs
-import geopandas as gpd
 from helpers import *
 import matplotlib
 import matplotlib.pyplot as plt
@@ -421,9 +422,9 @@ def plot_transport_ts(gatename):
 	data_root = '/global/cfs/cdirs/m1199/romina/data/timeseries/'
 	# fname = data_root + f'flowrate_{gatename}_ts_historical.nc'
 	fname = data_root + 'brn_dcmean_ts_historical.nc'
-
-	ds = xr.load_dataset(fname)
-
+	ds_sal = xr.load_dataset(data_root + f'sal_{gatename}_ts_historical.nc')
+	ds_temp = xr.load_dataset(data_root + f'ocntemp_{gatename}_ts_historical.nc')
+	ds = ds_sal.merge(ds_temp)
 
 	data = ds.resample(Time="YS").mean()
 	# plt.title(f'{ds["description"]} (yearly mean)')
@@ -432,15 +433,35 @@ def plot_transport_ts(gatename):
 	# data = ds.groupby("Time.month").mean(dim="Time")
 	# data = data.assign_coords(month=MONTHS)
 	# data = data.rename({'month':'Time'})
-	plt.title(f'Transport across {gatename} (monthly climo)')
 
 
-	for i in range(len(data['runname'])):
-		plt.plot(data['Time'], data['brn'].isel(runname=i),
-				 label=data['runname'][i].values, alpha=1)
+	plt.title(f'water properties along {gatename} (yearly mean)')
 
-	# plt.ylabel(f'{ds["description"]} ({ds["units"]})')
+
+	# for i in range(len(data['runname'])):
+	# 	dat_run = data.isel(runname=i)
+	# 	plt.scatter(dat_run['sal'], dat_run['ocntemp'], alpha=0.5, label=dat_run['runname'].values)
+	# 	# plt.plot(data['Time'], data['brn'].isel(runname=i),
+	# 	# 		 label=data['runname'][i].values, alpha=1)
+
+	dat_run = data.isel(runname=2)
+	plt.scatter(dat_run['sal'].T, dat_run['ocntemp'].T,
+				c=np.repeat(dat_run['depth'], len(dat_run['Time'])),
+				alpha=0.5, label=dat_run['runname'].values)
+	plt.colorbar(label='Depth (m)')
+
+	s = np.linspace(31,35.5, 20, endpoint=True)
+	t = np.linspace(-1, 6, 20, endpoint=True)
+	s, t = np.meshgrid(s, t)
+	dens = rho(s, t, 0)
+	cs = plt.contour(s, t, dens, colors='k', linestyles='--')
+	# Add labels to the contours
+	plt.clabel(cs, inline=True, fontsize=10)
 	plt.legend()
+
+	plt.xlabel('Salinity (PSU)')
+	plt.ylabel('Temperature ($^\circ$C)')
+
 	plt.show()
 
 
@@ -453,7 +474,7 @@ if __name__ == '__main__':
 
 	# putz_w_labsea_dcmask()
 
-	plot_transport_ts('osnap_west_LS')
+	plot_transport_ts('osnap_west_GS')
 
 	# unstructured_pcolor(0,0,0)
 	# open_some_data()

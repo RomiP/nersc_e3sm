@@ -220,7 +220,7 @@ def regional_avg_dataset(fieldnames, region):
 	enddate = dt.datetime(2015, 1, 1)
 	runs = ['historical0101', 'historical0151', 'historical0201', 'historical0251', 'historical0301']
 	mesh = xr.open_dataset(MESHFILE_OCN)
-	for run in runs[2:]:
+	for run in runs[1:]:
 		print(run)
 		all_fields = regionally_averaged_ts(run, startdate, enddate, fieldnames, mask=region, mesh=mesh)
 
@@ -314,9 +314,11 @@ if __name__ == '__main__':
 	# make_qnet_field(startdate, enddate, runs, type)
 
 	# extract_ts_from_composite_file()
-	print('1')
+	print('2')
 	# make_regionalavg_ts_dataset('sal', 'PSU')
-	regional_avg_dataset(['sal', 'ocntemp', 'pdens', 'brn'], 'regional_masks/model_dczone.geojson')
+	# starts from 0251
+	# regional_avg_dataset(['sal', 'ocntemp', 'pdens', 'brn'], 'regional_masks/flux_gates/osnap_west_GS.json')
+	regional_avg_dataset(['vmeridional', 'vzonal', 'bvfml'], 'regional_masks/model_dczone.geojson')
 	# for run in ['0101', '0151', '0251', '0301']:
 	# 	make_CDT_prof_dataset(run)
 
