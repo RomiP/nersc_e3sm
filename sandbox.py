@@ -2,6 +2,7 @@
 #
 # import cartopy.crs as ccrs
 # import geopandas as gpd
+import json
 
 from helpers import *
 import matplotlib
@@ -324,11 +325,11 @@ def plot_field_by_date(date, field, runnum, percentile=-1, plotargs={}):
 			dat = dat.mean(dim='runname')
 		else:
 			dat = dat.sel(runname=runtype + runnum)
-	elif field in filemap['atm']:
+	elif field in COMPONENTS['atm']:
 		dat = get_atmo_file_by_date(date.year, date.month, runtype+runnum)
-	elif field in filemap['ice']:
+	elif field in COMPONENTS['ice']:
 		dat = get_mpassi_file_by_date(date.year, date.month, runtype+runnum)
-	elif field in filemap['ocn']:
+	elif field in COMPONENTS['ocn']:
 		if 'max' in field:
 			dat = get_mpaso_file_by_date(date.year, date.month, runtype + runnum,
 										  varname='timeSeriesStatsMonthlyMax')
@@ -337,6 +338,9 @@ def plot_field_by_date(date, field, runnum, percentile=-1, plotargs={}):
 
 		field = VARNAMES[field]
 		lat, lon, cellnum = mpaso_mesh_latlon()
+	else:
+		print(f'Could not locat {field}')
+		return
 
 
 
@@ -465,6 +469,80 @@ def plot_transport_ts(gatename):
 	plt.show()
 
 
+def plot_eke_composites():
+	runname = 'historical0251'
+	runnum = ENSEMBLE.index(runname)
+	k = 5
+	jfile = open('maxMLD_dcmean_ts_historical_sorted.json')
+	mldsorted = json.load(jfile)
+	jfile.close()
+
+	# depthlim = [500, 2000]
+	depthlim = [0, 500]
+
+
+	mesh = xr.open_dataset(MESHFILE_OCN)
+	lats, lons, ncells = mpaso_mesh_latlon(mesh)
+	z = mpaso_depth(mesh)
+	mask = geopolygon_mask('regional_masks/LabIrm.geojson', lons, lats)
+	lons = lons[mask]
+	lats = lats[mask]
+	# ncells = np.argwhere(mask).squeeze()
+
+	ncells = ncells[mask]
+	print('4')
+	print(mldsorted[runname][:k])
+	print(mldsorted[runname][-k:])
+
+	yrs_max = mldsorted[runname][-k:]
+	yrs_min = mldsorted[runname][:k]
+	iz1 = np.argmin(np.abs(z - depthlim[0])).squeeze()
+	iz2 = np.argmin(np.abs(z - depthlim[1])).squeeze()
+
+	months = [i + 1 for i in range(12)]
+
+	compmin = load_composites(yrs_min, months, 'eke',
+							  {'nCells': ncells, 'runname':runnum})
+
+	compmin = compmin.isel(nVertLevels=slice(iz1, iz2))
+	compmin = compmin.mean(dim=['Time', 'nVertLevels'], skipna=True)
+
+	compmax = load_composites(yrs_max, months, 'eke',
+							  {'nCells':ncells, 'runname':runnum})
+
+	compmax = compmax.isel(nVertLevels=slice(iz1, iz2))
+	compmax = compmax.mean(dim=['Time', 'nVertLevels'], skipna=True)
+
+	plotargs = dict(
+		# projname='PlateCarree',
+		# extent=[-65, 0, 50, 70],
+		clim=[0, 0.01],
+		cmap='turbo',
+		clabel='EKE ($m^2 / S^2$)',
+		# extenttype='tight',
+		dotsize=1,
+		gridlines=True,
+		# title=,
+	)
+
+	fig, ax = unstructured_pcolor(lats, lons, compmax['eke'].values, **plotargs)
+	plt.title(f'Deepest MLD k={k} {runname} depth={str(depthlim)}')
+	plt.savefig(f'figs/eke_k={k}max_{runname}_{depthlim[0]}-{depthlim[1]}m.png')
+	plt.show()
+	fig, ax = unstructured_pcolor(lats, lons, compmin['eke'].values, **plotargs)
+	plt.title(f'Shallowest MLD k={k} {runname} depth={str(depthlim)}')
+	plt.savefig(f'figs/eke_k={k}min_{runname}_{depthlim[0]}-{depthlim[1]}m.png')
+
+	plt.show()
+
+	plotargs['cmap'] = 'coolwarm'
+	plotargs['clim'] = [-0.002, 0.002]
+	fig, ax = unstructured_pcolor(lats, lons, compmax['eke'].values - compmin['eke'].values, **plotargs)
+	plt.title(f'Diff MLD k={k} {runname} depth={str(depthlim)}')
+	plt.savefig(f'figs/eke_k={k}diff_{runname}_{depthlim[0]}-{depthlim[1]}m.png')
+	plt.show()
+
+
 if __name__ == '__main__':
 	# supported values are ['gtk3agg', 'gtk3cairo', 'gtk4agg', 'gtk4cairo', 'macosx', 'nbagg', 'notebook', 'qtagg',
 	# 'qtcairo', 'qt5agg', 'qt5cairo', 'tkagg', 'tkcairo', 'webagg', 'wx', 'wxagg', 'wxcairo', 'agg', 'cairo', 'pdf',
@@ -474,7 +552,7 @@ if __name__ == '__main__':
 
 	# putz_w_labsea_dcmask()
 
-	plot_transport_ts('osnap_west_GS')
+	# plot_transport_ts('osnap_west_GS')
 
 	# unstructured_pcolor(0,0,0)
 	# open_some_data()
@@ -483,6 +561,11 @@ if __name__ == '__main__':
 	# 	plot_heatmap(run)
 
 	# plot_qnet_data()
+
+	# plot_field_by_date(dt.datetime(1950,1,1),'ssh', '0101')
+	# plt.show()
+
+	plot_eke_composites()
 
 	# %% Make some one-off plots of qnet for weird convection years
 
@@ -538,12 +621,25 @@ if __name__ == '__main__':
 	# 	title=' Oct-Mar',
 	# )
 
-	'''
-	run 0101
-	1986, high qnet, deep ml
-	2012, high qnet, shallow ml -> 1950, 1969 deep ml, similar qnet
-	'''
-
+	# field = 'ssh'
+	# plotargs = dict(
+	# 	projname='Miller',
+	# 	extent=[-70, -30, 50, 70],
+	# 	clim=[0, -2],
+	# 	cmap='viridis',
+	# 	clabel='Sea surface height (m)',
+	# 	# extenttype='tight',
+	# 	dotsize=1,
+	# 	gridlines=True,
+	# 	title=' Oct-Mar',
+	# )
+	#
+	# '''
+	# run 0101
+	# 1986, high qnet, deep ml
+	# 2012, high qnet, shallow ml -> 1950, 1969 deep ml, similar qnet
+	# '''
+	#
 	# for month in [1,2,3,4]:
 	# 	date = dt.datetime(2012, month, 1)
 	# 	plotargs['title'] = date.strftime('%b %Y')

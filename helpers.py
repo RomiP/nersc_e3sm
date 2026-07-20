@@ -316,14 +316,18 @@ def N2_e3sm(data, cellmask=None, mesh=None, lons=None, lats=None):
 
 if __name__ == '__main__':
 	pass
-	# data = get_mpaso_file_by_date(1950, 1, 'historical0101')
-	data = zip_subset_by_time(make_monthly_date_list(dt.datetime(1950, 1, 1),
-													 dt.datetime(1950, 4, 1)),
-							  get_mpaso_file_by_date,
-							  runname='historical0101',
-							  varnames=['sal', 'ocntemp'],
-							  )
-	mask = np.zeros(594836)
-	mask[::2] = 1
-	# d = rho_e3sm(data, mask)
-	n2 = N2_e3sm(data, mask)
+	# # data = get_mpaso_file_by_date(1950, 1, 'historical0101')
+	# data = zip_subset_by_time(make_monthly_date_list(dt.datetime(1950, 1, 1),
+	# 												 dt.datetime(1950, 4, 1)),
+	# 						  get_mpaso_file_by_date,
+	# 						  runname='historical0101',
+	# 						  varnames=['sal', 'ocntemp'],
+	# 						  )
+	# mask = np.zeros(594836)
+	# mask[::2] = 1
+	# # d = rho_e3sm(data, mask)
+	# n2 = N2_e3sm(data, mask)
+
+	mesh = xr.open_dataset(MESHFILE_OCN)
+	lons, lats, ncells = mpaso_mesh_latlon(mesh)
+	mask = geopolygon_mask('regional_masks/LabIrm.geojson', lons, lats)

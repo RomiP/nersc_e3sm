@@ -97,7 +97,6 @@ def zip_subset_by_time(dates, getfile, varnames, mask=None, **kwargs):
 
 	return subset
 
-
 def max_mld_ts_dir(runnum='0151'):
 	return f'/global/cfs/cdirs/m1199/e3sm-arrm-simulations/E3SM-Arcticv2.1_historical{runnum}/timeseries_data/maxMLD/'
 
@@ -193,6 +192,16 @@ def get_atmo_file_by_date(year, month, runname, timestep='h0'):
 	else:
 		f = xr.open_dataset(path)
 		return f
+
+def get_composite_file_by_date(year, month, varname):
+	root = '/global/cfs/cdirs/m1199/romina/data/composite_fields/'
+	if varname == 'qnet':
+		return xr.open_dataset(root + 'netHeatFlux_historical.nc')
+	elif varname == 'eke':
+		f = f'eke_historical/eke_historical_{year}-{month:02}.nc'
+		return xr.open_dataset(root + f)
+	else:
+		raise NotImplementedError
 
 def get_climatology(varname, month, runtype, overwrite=False):
 	fname = '/global/cfs/cdirs/m1199/romina/data/climos/'
@@ -300,6 +309,22 @@ def get_ensemble_average(year, month, component, **kwargs):
 	ds = xr.concat(data, dim='runname')
 	return ds
 
+def load_composites(years, months, param, subset={}):
+
+	comp = None
+	for y in tqdm(years):
+		for m in months:
+			x = get_composite_file_by_date(y, m, param)
+			if subset != {}:
+				x = x.isel(subset)
+
+			if comp is None:
+				comp = x
+			else:
+				comp = xr.concat([comp, x], dim='Time')
+
+	return comp
+
 if __name__ == '__main__':
 	pass
 	# get_arctic_ocn_region_mask('Labrador Sea')
@@ -319,3 +344,10 @@ if __name__ == '__main__':
 	#
 	# roi = subset_region(['Labrador Sea', 'Irminger Sea'], max_mld)
 	# print()
+	mesh = xr.open_dataset(MESHFILE_OCN)
+	lons, lats, _ = mpaso_mesh_latlon(mesh)
+	mask = geopolygon_mask('regional_masks/LabSea_whole.geojson', lons, lats)
+	mask = np.argwhere(mask).squeeze()
+
+	comp = load_composites([1950, 2009, 2013, 1951, 2007], [i + 1 for i in range(12)], 'eke',
+					{'nCells':mask, 'runname':[3]})

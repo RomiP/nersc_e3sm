@@ -1,3 +1,5 @@
+import os.path
+
 from cftime import datetime as cdt
 import datetime as dt
 from helpers import *
@@ -51,6 +53,102 @@ def make_qnet_field(startdate, enddate, runs, type):
 	ds.attrs['Summed variables'] = heat_varnames
 
 	ds.to_netcdf(f'/global/cfs/cdirs/m1199/romina/data/netHeatFlux_{type}.nc')
+
+def compute_climo():
+	startdate = dt.datetime(1950, 1, 1)
+	enddate = dt.datetime(2015, 1, 1)
+	datelist = make_monthly_date_list(startdate, enddate)
+	runs = ['historical0101', 'historical0151', 'historical0201', 'historical0251', 'historical0301']
+
+	outfile = f'/global/cfs/cdirs/m1199/romina/data/composite_fields/ocnspeed_climo_historical2.nc'
+
+	for runname in runs:
+		print(runname)
+
+		u_bar = 0
+		v_bar = 0
+		count = 0
+		for date in tqdm(datelist):
+			modeldat = get_mpaso_file_by_date(date.year, date.month, runname).isel(Time=0)
+			u_bar += modeldat[VARNAMES['vzonal']]
+			v_bar += modeldat[VARNAMES['vmeridional']]
+			count += 1
+			modeldat.close()
+		ds_new = xr.Dataset({'u_bar': u_bar / count, 'v_bar': v_bar / count})
+
+		ds_new = ds_new.assign_coords(runname=[runname])
+
+		# --- Save / Append logic ---
+		if os.path.exists(outfile):
+			print("Appending to existing file...")
+
+			with xr.open_dataset(outfile) as ds_existing:
+				ds_combined = xr.concat([ds_existing, ds_new], dim='runname')
+
+				# Combine along runname dimension
+				ds_combined = xr.concat([ds_existing, ds_new], dim='runname')
+
+				# Optional: remove duplicate runnames if rerunning
+				_, index = np.unique(ds_combined['runname'], return_index=True)
+				ds_combined = ds_combined.isel(runname=index)
+
+			ds_combined.to_netcdf(outfile, mode='w')
+
+		else:
+			print("Creating new file...")
+			ds_new.attrs['description'] = "Climatological horizontal ocean velocity (eastward and northward)"
+			ds_new.attrs['units'] = "m s^-1"
+			ds_new.to_netcdf(outfile)
+
+		ds_new.close()
+
+def make_EKE_field():
+	startdate = dt.datetime(1950, 1, 1)
+	enddate = dt.datetime(2015, 1, 1)
+	datelist = make_monthly_date_list(startdate, enddate)
+	runs = ['historical0101', 'historical0151', 'historical0201', 'historical0251', 'historical0301']
+
+	outdir = '/global/cfs/cdirs/m1199/romina/data/composite_fields/eke_historical/'
+
+	climo = f'/global/cfs/cdirs/m1199/romina/data/composite_fields/ocnspeed_climo_historical.nc'
+	climo = xr.open_dataset(climo)
+
+	for date in tqdm(datelist):
+		outfile = outdir + f'eke_historical_{date.strftime("%Y-%m")}.nc'
+		if os.path.exists(outfile):
+			continue
+
+		u = None
+		v = None
+		for runname in runs:
+			modeldat = get_mpaso_file_by_date(date.year, date.month, runname).isel(Time=0)
+			if u is None:
+				u = modeldat[VARNAMES['vzonal']]
+				v = modeldat[VARNAMES['vmeridional']]
+			else:
+				u = xr.concat([u, modeldat[VARNAMES['vzonal']]], dim='runname')
+				v = xr.concat([v, modeldat[VARNAMES['vmeridional']]], dim='runname')
+			modeldat.close()
+
+		u.assign_coords(runname=runs)
+		v.assign_coords(runname=runs)
+
+		ds_new = xr.Dataset({'u_anom': u - climo['u_bar'],
+							 'v_anom': v - climo['v_bar']})
+		ds_new['eke'] = (ds_new['u_anom'] ** 2 + ds_new['v_anom'] ** 2) * 0.5
+
+		ds_new['u_anom'].attrs = {'units': 'm s^-1',
+								  'description': 'horizontal velocity anomaly in the eastward direction'}
+		ds_new['v_anom'].attrs = {'units': 'm s^-1',
+								  'description': 'horizontal velocity anomaly in the northward direction'}
+		ds_new['eke'].attrs = {'units': 'm^2 s^-2',
+								  'description': 'eddy kinetic energy'}
+		ds_new.attrs['description'] = f"Eddy kinetic energy EKE = (u'^2 + v'^2) / 2, where u' = u - u_climo"
+
+		outfile = outdir + f'eke_historical_{date.strftime("%Y-%m")}.nc'
+		ds_new.to_netcdf(outfile)
+
+		ds_new.close()
 
 def extract_ts_from_composite_file():
 	type = 'historical'
@@ -252,13 +350,6 @@ def regional_avg_dataset(fieldnames, region):
 				# 	'description'] = f'Labrador Sea {fieldname} mean over deep convection zone recorded over monthly time period.'
 				ds_new.to_netcdf(outfile)
 
-
-
-
-
-
-
-
 def make_CDT_prof_dataset(runnum):
 
 	lat, lon, ncell = mpaso_mesh_latlon()
@@ -288,9 +379,6 @@ def make_CDT_prof_dataset(runnum):
 	prof.to_netcdf(f'/global/cfs/projectdirs/m1199/romina/data/profiles/LabSea_ctd_dczone_{runnum}.nc')
 	print()
 
-
-
-
 if __name__ == '__main__':
 	# %% date ranges and params
 
@@ -314,14 +402,15 @@ if __name__ == '__main__':
 	# make_qnet_field(startdate, enddate, runs, type)
 
 	# extract_ts_from_composite_file()
-	print('2')
+	print('1')
 	# make_regionalavg_ts_dataset('sal', 'PSU')
 	# starts from 0251
 	# regional_avg_dataset(['sal', 'ocntemp', 'pdens', 'brn'], 'regional_masks/flux_gates/osnap_west_GS.json')
-	regional_avg_dataset(['vmeridional', 'vzonal', 'bvfml'], 'regional_masks/model_dczone.geojson')
+	# regional_avg_dataset(['vmeridional', 'vzonal', 'bvfml'], 'regional_masks/model_dczone.geojson')
 	# for run in ['0101', '0151', '0251', '0301']:
 	# 	make_CDT_prof_dataset(run)
-
+	compute_climo()
+	# make_EKE_field()
 
 
 

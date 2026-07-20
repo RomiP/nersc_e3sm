@@ -83,7 +83,8 @@ def unstructured_pcolor(lat, lon, dat=None, **kwargs):
 
 	# set defaults
 	if not 'extent' in kwargs:
-		extent = [-65, 0, 30, 80]
+		# extent = [-65, 0, 30, 80]
+		extent = [min(lon), max(lon), min(lat), max(lat)]
 	else:
 		extent = kwargs['extent']
 	if not 'extenttype' in kwargs:
