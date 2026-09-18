@@ -448,7 +448,7 @@ def plot_transport_ts(gatename):
 	# 	# plt.plot(data['Time'], data['brn'].isel(runname=i),
 	# 	# 		 label=data['runname'][i].values, alpha=1)
 
-	dat_run = data.isel(runname=2)
+	dat_run = data.isel(runname=3)
 	plt.scatter(dat_run['sal'].T, dat_run['ocntemp'].T,
 				c=np.repeat(dat_run['depth'], len(dat_run['Time'])),
 				alpha=0.5, label=dat_run['runname'].values)
@@ -470,7 +470,7 @@ def plot_transport_ts(gatename):
 
 
 def plot_eke_composites():
-	runname = 'historical0251'
+	runname = 'historical0301'
 	runnum = ENSEMBLE.index(runname)
 	k = 5
 	jfile = open('maxMLD_dcmean_ts_historical_sorted.json')
@@ -490,7 +490,7 @@ def plot_eke_composites():
 	# ncells = np.argwhere(mask).squeeze()
 
 	ncells = ncells[mask]
-	print('4')
+	print('5')
 	print(mldsorted[runname][:k])
 	print(mldsorted[runname][-k:])
 
@@ -552,7 +552,7 @@ if __name__ == '__main__':
 
 	# putz_w_labsea_dcmask()
 
-	# plot_transport_ts('osnap_west_GS')
+	plot_transport_ts('osnap_west_GS')
 
 	# unstructured_pcolor(0,0,0)
 	# open_some_data()
@@ -565,7 +565,7 @@ if __name__ == '__main__':
 	# plot_field_by_date(dt.datetime(1950,1,1),'ssh', '0101')
 	# plt.show()
 
-	plot_eke_composites()
+	# plot_eke_composites()
 
 	# %% Make some one-off plots of qnet for weird convection years
 

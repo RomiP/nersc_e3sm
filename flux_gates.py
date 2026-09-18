@@ -1,8 +1,11 @@
+import json
+
 import matplotlib.pyplot as plt
 import numpy as np
 import shapely
 from datashader.colors import viridis
 from bootstrap import *
+from mesh_tools import djikstra_edges, sign_flip, edge_sign_for_direction
 from open_e3sm_files import *
 from plot_unstructured import *
 
@@ -111,6 +114,7 @@ def buildCellPoly(cell, latV, lonV):
 	return poly
 
 def djikstra(start, stop, mesh, mask=None):
+	import heapq
 	lons = np.degrees(mesh.lonCell.values)
 	lats = np.degrees(mesh.latCell.values)
 	lons[lons > 180] -= 360
@@ -134,13 +138,6 @@ def djikstra(start, stop, mesh, mask=None):
 	dist[istart] = 0.0
 	pq = []
 	heapq.heappush(pq, (0, istart))
-
-	# pq = [(0.0, istart)]
-
-	# pend = (lats[istop], lons[istop])
-	# pstart = (lats[istart], lons[istart])
-	# d = geodesic(pstart, pend).km
-	# pq = [(d, istart)]
 
 	while pq:
 		'''
@@ -192,7 +189,8 @@ def djikstra(start, stop, mesh, mask=None):
 
 	return path
 
-def make_flux_gate_mask(root, fname):
+def make_flux_gate_mask(root, fname, edges=False):
+	from mesh_tools import djikstra_edges
 	# root = 'regional_masks/flux_gates/'
 	# fname = 'denmark_strait'
 	gate = gpd.read_file(root + fname + '.geojson')
@@ -201,26 +199,38 @@ def make_flux_gate_mask(root, fname):
 	coords = gate.get_coordinates().values
 
 	bounds = gate.total_bounds
+
 	lat, lon, ncells = mpaso_mesh_latlon()
+	mesh = xr.load_dataset(MESHFILE_OCN)
+	if edges:
+		lon = np.degrees(mesh.lonEdge.values)
+		lat = np.degrees(mesh.latEdge.values)
+		lon[lon > 180] -= 360
+		ncells = mesh.nEdges.values
+
 	buffer = 1
 	idx = ((lon > bounds[0] - buffer) & (lon < bounds[2] + buffer) &
 		   (lat > bounds[1] - buffer) & (lat < bounds[3] + buffer))
-	mesh = xr.load_dataset(MESHFILE_OCN)  # .sel(nCells=idx)
 
 	# mesh_gate = djikstra(coords[0], coords[1], mesh, idx)
 	mesh_gate = []
 	for i in range(len(coords) - 1):
-		mesh_gate += djikstra(coords[i], coords[i + 1], mesh, idx)
+		if edges:
+			mesh_gate += djikstra_edges(coords[i], coords[i + 1], mesh, idx)
+		else:
+			mesh_gate += djikstra(coords[i], coords[i + 1], mesh, idx)
 
 	gate_mask = list(np.zeros(len(ncells)))
 	for i in mesh_gate:
 		gate_mask[i] = 1
 
+	nametype = 'cell' if not edges else 'edge'
 	mesh_gate = {
-		'cellnums': [int(i) for i in mesh_gate],
+		f'{nametype}nums': [int(i) for i in mesh_gate],
 		'mask': gate_mask,
 	}
 
+	fname += '_edges'*edges
 	with open(root + fname + '.json', 'w') as f:
 		json.dump(mesh_gate, f, indent=4)
 
@@ -335,6 +345,10 @@ def plot_flux(flux, gateline, mask, cmapname='coolwarm'):
 	plt.pcolormesh(x, z, flux[:,idx], cmap=cmap)
 	cbar = plt.colorbar()
 
+	ax = plt.gca()
+	# cs = plt.contour(x, z, flux[:,idx], c='k', levels=[35, 35.1, 35.2, 35.3])
+	# ax.clabel(cs, cs.levels, fontsize=10)
+
 
 	# Set the color for NaN values (e.g., 'gray' or 'red')
 	cmap.set_bad(color='tab:gray')
@@ -342,7 +356,7 @@ def plot_flux(flux, gateline, mask, cmapname='coolwarm'):
 	maxdepth = np.argwhere(np.any(bathmask, axis=1))[-1, 0]
 	# print(z[maxdepth + 1])
 	plt.ylim([0, z[maxdepth + 1]])
-	ax = plt.gca()
+
 	ax.invert_yaxis()
 	plt.ylabel('Depth (m)')
 	plt.xlabel('Distance along gate (km)')
@@ -393,12 +407,14 @@ def plot_crosssection(data, runnum, varname, mask):
 		flux = rho_e3sm(data, mask).T
 	else:
 		flux = data[VARNAMES[varname]].values[mask, :].T
-	fig, ax, cbar = plot_flux(flux, gate_line, mask, 'viridis')
+	fig, ax, cbar = plot_flux(flux, gate_line, mask, 'turbo')
 
 	if varname == 'sal':
 		cbar.set_label('Salinity (PSU)')
-		plt.clim(30, 35.5)
-		plt.title(f'Denmark Strait Salinity ({dates[0].year} - {dates[-1].year})')
+		plt.clim(35, 35.3)
+
+		plt.title(f'AR7 Line Salinity ({dates[0].year} - {dates[-1].year})')
+		# plt.title(f'Denmark Strait Salinity ({dates[0].year} - {dates[-1].year})')
 
 	elif varname == 'ocntemp':
 		cbar.set_label('Temperature ($^\circ$C)')
@@ -407,7 +423,6 @@ def plot_crosssection(data, runnum, varname, mask):
 
 	plt.savefig(f'figs/flux_gates/{fname}_{varname}_{runnum}_y{dates[0].year}-{dates[-1].year}.png')
 	plt.show()
-
 
 def flux_index_dataset(gatename, posquad=[1,2]):
 	root = 'regional_masks/flux_gates/'
@@ -528,23 +543,131 @@ def plot_TS_diagram(data, runnum, depth, mask):
 
 # 	todo: add freezing point to TS diagram
 
+def linesegment_normal(line, **kwargs):
+	pass
+
+def edgeflux_dataset(mask_name, polygon=False, posquad=None):
+	# get edge mask
+	root = 'regional_masks/flux_gates/'
+	mesh_gate = json.load(open(root + mask_name + '_edges.json'))
+	mask = np.array(mesh_gate['mask']).astype(bool)
+	mesh = xr.open_dataset(MESHFILE_OCN)
+	z = mpaso_depth(mesh)
+
+	# get gate normal vector, calculate sign convention
+	gate_line = gpd.read_file(root + '../'*polygon + mask_name + '.geojson')
+
+	if polygon:
+		coords = gate_line.get_coordinates().values
+		centre = gate_line.centroid.get_coordinates().values.squeeze()
+	# 	todo: repeat for polygon
+	else:
+		norm = normal_vector(gate_line.boundary, parallel=False)
+		if posquad is not None:
+			quad = quadrant(norm)
+			if not quad in posquad:
+				norm = - norm
+
+		# sign, fluxdir = sign_flip(norm, mask, mesh)
+		# sign = np.tile(sign, (80, 1))
+		# fluxdir = np.tile(fluxdir, (80, 1))
+
+		sign1, dot1 = edge_sign_for_direction(mesh_gate['edgenums'], mesh, [0,1])
+		sign1 = np.tile(sign1, (80, 1))
+		dot1 = np.tile(dot1, (80, 1))
+
+
+	# add 180 deg to angleEdge to get consistent direction
+	mesh = mesh.isel(nEdges=mesh_gate['edgenums'])
+	angleedge = mesh.angleEdge.values
+	angleedge[angleedge < 0] += np.pi
+	angleedge = np.tile(angleedge, (80, 1))
+
+	# determine distance of edge centre along gate - sort
+
+	lons = np.degrees(mesh.lonEdge.values)
+	lats = np.degrees(mesh.latEdge.values)
+	lons[lons > 180] -= 360
+	coords = gate_line.get_coordinates().values[:, ::-1]
+	dist = (lats - coords[0, 0]) ** 2 + (lons - coords[0, 1]) ** 2
+	idx = np.argsort(dist)
+
+
+	# dx, dz = np.meshgrid(dv, z)
+
+	# load data, subset edges
+	data = get_mpaso_file_by_date(1950, 1, 'historical0101').isel(Time=0)
+	f = data['timeMonthly_avg_normalVelocity'].isel(nEdges=mesh_gate['edgenums'])
+	sign, dots = edge_sign_for_direction(mesh=mesh, target=[0, -1])
+
+	dv = mesh.dvEdge.values[idx]
+	dx = np.cumsum(dv*np.abs(dots)) / 1000
+
+	sign = np.tile(sign[idx], (80, 1))
+	dots = np.tile(dots[idx], (80, 1))
+	y = f.values.squeeze()[idx, :].T * sign1[:, idx]
+	x = f.values.squeeze()[idx, :].T * dots
+	print()
+
+	plt.pcolormesh(dx, z, y, cmap='coolwarm')
+	plt.clim(-0.5, 0.5)
+	# flux[~bathmask] = np.nan
+	cbar = plt.colorbar()
+
+	ax = plt.gca()
+	# cs = plt.contour(x, z, flux[:,idx], c='k', levels=[35, 35.1, 35.2, 35.3])
+	# ax.clabel(cs, cs.levels, fontsize=10)
+
+	# Set the color for NaN values (e.g., 'gray' or 'red')
+	# cmap.set_bad(color='tab:gray')
+
+	# maxdepth = np.argwhere(np.any(bathmask, axis=1))[-1, 0]
+	# # print(z[maxdepth + 1])
+	plt.ylim([0, 3500])
+
+	ax.invert_yaxis()
+	plt.ylabel('Depth (m)')
+	plt.xlabel('Distance along gate (km)')
+	plt.show()
+	# theta = angleedge - np.atan(norm[0]/norm[1])
+
+
 if __name__ == '__main__':
-	print('2')
+	print('4')
 
 	root = 'regional_masks/flux_gates/'
-	fname = 'osnap_west_LS'
+	fname = 'ar7_approx'
+	# fname = 'LabSea_central2'
 	gate_line = gpd.read_file(root + fname + '.geojson')
-	if not os.path.exists(root + fname + '.json'):
-		import heapq
-		make_flux_gate_mask(root, fname)
+	# if not os.path.exists(root + fname + '_edges.json'):
+	# 	make_flux_gate_mask(root, fname, edges=True)
+
+	edgeflux_dataset(fname, False, [3,4])
 
 	mesh_gate = json.load(open(root + fname + '.json'))
 	mask = np.array(mesh_gate['mask']).astype(bool)
-	cellnums = np.array(mesh_gate['cellnums'])
+
+	# cellnums = np.array(mesh_gate['cellnums'])
+	# positive_quadrant = [1,2]
+	# par = False
+
+	# mesh = xr.open_dataset(MESHFILE_OCN)
+	# z = mpaso_depth(mesh)
+	# iz = np.argmax(z>200)
+	#
+	# edgenums = np.array(mesh_gate['edgenums'])
+	# posvec = np.array([-52.257738 + 53.8168085, 56.8198172 - 57.61676])
+	# from mesh_tools import sign_flip
+	#
+	# sign = sign_flip(posvec, edgenums)
+	#
+	# data = get_mpaso_file_by_date(1950, 1, 'historical0101').isel(Time=0)
+	# fluxparam = data['timeMonthly_avg_normalMLEvelocity'][mask,:]
+	# fluxparam = fluxparam.isel(nVertLevels=slice(0, iz)).mean(dim='nVertLevels') * sign
+	# fluxparam = fluxparam.mean()
 
 
-	positive_quadrant = [1,2]
-	par = False
+
 
 
 	# %% calculate and plot flux
@@ -558,40 +681,42 @@ if __name__ == '__main__':
 	# data = get_mpaso_file_by_date(1950, 1, runnum)
 	# # plot_TS_diagram(data, runnum, 100, mask)
 	# # plot_normal_velocity(dates, runnum)
-	# # plot_crosssection(data, runnum, 'dens', mask)
-	# # plot_normal_velocity(data, gate_line, mask,
-	# # 					 title=f'GWBC Transport {runnum} ({dates[0].year} - {dates[-1].year})',
-	# # 					 saveas=f'figs/flux_gates/{fname}_transport_{runnum}_{dates[0].year}-{dates[-1].year}.png'
-	# # 					 )
+	# # plot_crosssection(data, runnum, 'sal', mask)
+	# plot_normal_velocity(data, gate_line, mask,
+	# 					 title=f'GWBC Transport {runnum} ({dates[0].year} - {dates[-1].year})',
+	# 					 # saveas=f'figs/flux_gates/{fname}_transport_{runnum}_{dates[0].year}-{dates[-1].year}.png'
+	# 					 )
+	# plt.show()
 
-	# flux_ts(data, mask, gate_line)
-	# flux_index_dataset('model_dczone')
-
-	# ystep = 10
-	# for runnum in ['historical0101', 'historical0151', 'historical0201', 'historical0251', 'historical0301']:
-	# 	print('\t' + runnum)
+	# # flux_ts(data, mask, gate_line)
+	# # flux_index_dataset('model_dczone')
+	# #
+	# # ystep = 10
+	# # for runnum in ['historical0101', 'historical0151', 'historical0201', 'historical0251', 'historical0301']:
+	# # 	print('\t' + runnum)
+	# #
+	# # 	for i in range(1950, 2015, ystep):
+	# # 		print(i, min(2014, i+ystep))
+	# # 		dates = make_monthly_date_list(dt.datetime(i, 1, 1),
+	# # 									   dt.datetime(min(2015, i + ystep), 1, 1))
+	# #
+	# # 		data = zip_subset_by_time(dates, get_mpaso_file_by_date, ['sal', 'ocntemp'], runname=runnum)
+	# #
+	# # 		plot_normal_velocity(dates, runnum, par=par)
+	# # 		plot_crosssection(data, runnum, 'ocntemp', mask)
+	# # 		plot_crosssection(data, runnum, 'sal', mask)
+	# # 		plot_TS_diagram(data, runnum, mask)
 	#
-	# 	for i in range(1950, 2015, ystep):
-	# 		print(i, min(2014, i+ystep))
-	# 		dates = make_monthly_date_list(dt.datetime(i, 1, 1),
-	# 									   dt.datetime(min(2015, i + ystep), 1, 1))
-	#
-	# 		data = zip_subset_by_time(dates, get_mpaso_file_by_date, ['sal', 'ocntemp'], runname=runnum)
-	#
-	# 		# plot_normal_velocity(dates, runnum, par=par)
-	# 		# plot_crosssection(data, runnum, 'ocntemp', mask)
-	# 		# plot_crosssection(data, runnum, 'sal', mask)
-	# 		plot_TS_diagram(data, runnum, mask)
-
 
 
 	# %% Create mask and plot fluxgate
 
-	lat, lon, ncells = mpaso_mesh_latlon()
-	gate_lats = lat[mask]
-	gate_lons = lon[mask]
+	# lat, lon, ncells = mpaso_mesh_latlon()
+	# gate_lats = lat[mask]
+	# gate_lons = lon[mask]
+	#
+	# plot_fluxgate(gate_line, gate_lats, gate_lons,
+	# 			  parallel=par, posquad=positive_quadrant)
+	#
+	# plt.show()
 
-	plot_fluxgate(gate_line, gate_lats, gate_lons,
-				  parallel=par, posquad=positive_quadrant)
-
-	plt.show()
