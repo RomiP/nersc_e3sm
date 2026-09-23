@@ -1,3 +1,5 @@
+import numpy as np
+
 from bootstrap import *
 from open_e3sm_files import *
 from plot_unstructured import *
@@ -103,13 +105,14 @@ def sign_flip(unitvec, edges, mesh=None):
 
 	return fluxdir, dirn
 
-def edge_sign_for_direction(edgeIDs=None, mesh=None, target=(0., 1.)):
+def edge_sign_for_direction(edgeIDs=None, mesh=None, target=(0., 1.), polygon=False):
 
 	if mesh is None:
 		mesh = xr.open_dataset(MESHFILE_OCN)
 
 	if edgeIDs is not None:
 		theta = mesh.angleEdge[edgeIDs].values
+		mesh = mesh.isel(nEdges=edgeIDs)
 	else:
 		theta = mesh.angleEdge.values
 
@@ -117,22 +120,45 @@ def edge_sign_for_direction(edgeIDs=None, mesh=None, target=(0., 1.)):
 	normal_y = np.cos(theta)
 
 	target = np.asarray(target)
-	dots = normal_x * target[0] + normal_y * target[1]
+	if polygon:
+		lon = np.degrees(mesh.lonEdge.values)
+		lat = np.degrees(mesh.latEdge.values)
+		lon[lon > 180] -= 360
+
+		a_x = lon + normal_x
+		a_y = lat + normal_y
+
+		b_x = target[0] - lon
+		b_y = target[1] - lat
+
+		dots = a_x * b_x + a_y * b_y
+
+	else:
+		dots = normal_x * target[0] + normal_y * target[1]
 
 	return np.where(dots >= 0, 1, -1), dots
 
 
 if __name__ == '__main__':
-	# root = '/Volumes/Marvin/E3SM/'
-	# mesh = xr.open_dataset(root + 'mpaso.ARRM10to60E2r1.rstFrom1monthG-chrys.220802.nc')
-	mesh = xr.load_dataset(MESHFILE_OCN)
-	data = ''
+	# get edge mask
+	root = 'regional_masks/flux_gates/'
+	mask_name = 'LabSea_central2'
+	polygon = True
+	mesh_gate = json.load(open(root + mask_name + '_edges.json'))
+	mask = np.array(mesh_gate['mask']).astype(bool)
+	mesh = xr.open_dataset(MESHFILE_OCN)
+	z = mpaso_depth(mesh)
 
-	unitvec = np.array([1, 1])
+	# get gate normal vector, calculate sign convention
+	gate_line = gpd.read_file(root + '../' * polygon + mask_name + '.geojson')
 
-	start, stop = [-26,69],[-23.492204845737092,66.12600770401113]
+	cells = mesh.cellsOnEdge.isel(nEdges=mesh_gate['edgenums'], TWO=0).values - 1
+	dz = mesh.layerThickness.values.squeeze().T[:, cells]
+	bathmask = dz > 0
 
-	path = djikstra_edges(start, stop, mesh)
-	print(path)
-
-	sign_flip(unitvec, path, mesh)
+	if polygon:
+		coords = gate_line.get_coordinates().values
+		centre = gate_line.centroid.get_coordinates().values.squeeze()
+		mesh = mesh.isel(nEddges=mesh_gate['edgenums'])
+		sign, dot = edge_sign_for_direction(mesh=mesh, target=centre, polygon=True)
+		sign = np.tile(sign, (80, 1))

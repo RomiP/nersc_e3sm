@@ -546,7 +546,7 @@ def plot_TS_diagram(data, runnum, depth, mask):
 def linesegment_normal(line, **kwargs):
 	pass
 
-def edgeflux_dataset(mask_name, polygon=False, posquad=None):
+def edgeflux_dataset(mask_name, polygon=False, normalvec=[0,1], cmapname='coolwarm'):
 	# get edge mask
 	root = 'regional_masks/flux_gates/'
 	mesh_gate = json.load(open(root + mask_name + '_edges.json'))
@@ -557,95 +557,141 @@ def edgeflux_dataset(mask_name, polygon=False, posquad=None):
 	# get gate normal vector, calculate sign convention
 	gate_line = gpd.read_file(root + '../'*polygon + mask_name + '.geojson')
 
+	cells = mesh.cellsOnEdge.isel(nEdges=mesh_gate['edgenums'], TWO=0).values - 1
+	dz = mesh.layerThickness.values.squeeze().T[:, cells]
+	bathmask = dz > 0
+
 	if polygon:
 		coords = gate_line.get_coordinates().values
 		centre = gate_line.centroid.get_coordinates().values.squeeze()
-	# 	todo: repeat for polygon
+		sign, dot = edge_sign_for_direction(mesh_gate['edgenums'], mesh, centre, polygon=True)
+		sign = np.tile(sign, (80, 1))
 	else:
-		norm = normal_vector(gate_line.boundary, parallel=False)
-		if posquad is not None:
-			quad = quadrant(norm)
-			if not quad in posquad:
-				norm = - norm
 
-		# sign, fluxdir = sign_flip(norm, mask, mesh)
-		# sign = np.tile(sign, (80, 1))
-		# fluxdir = np.tile(fluxdir, (80, 1))
+		# norm = normal_vector(gate_line.boundary, parallel=False)
+		# if posquad is not None:
+		# 	quad = quadrant(norm)
+		# 	if not quad in posquad:
+		# 		norm = - norm
 
-		sign1, dot1 = edge_sign_for_direction(mesh_gate['edgenums'], mesh, [0,1])
-		sign1 = np.tile(sign1, (80, 1))
-		dot1 = np.tile(dot1, (80, 1))
+		sign, dot = edge_sign_for_direction(mesh_gate['edgenums'], mesh, normalvec)
+		sign = np.tile(sign, (80, 1))
 
 
 	# add 180 deg to angleEdge to get consistent direction
 	mesh = mesh.isel(nEdges=mesh_gate['edgenums'])
-	angleedge = mesh.angleEdge.values
-	angleedge[angleedge < 0] += np.pi
-	angleedge = np.tile(angleedge, (80, 1))
+	# angleedge = mesh.angleEdge.values
+	# angleedge[angleedge < 0] += np.pi
+	# angleedge = np.tile(angleedge, (80, 1))
 
 	# determine distance of edge centre along gate - sort
-
 	lons = np.degrees(mesh.lonEdge.values)
 	lats = np.degrees(mesh.latEdge.values)
 	lons[lons > 180] -= 360
 	coords = gate_line.get_coordinates().values[:, ::-1]
-	dist = (lats - coords[0, 0]) ** 2 + (lons - coords[0, 1]) ** 2
+	if polygon:
+		dx = lons - centre[0]
+		dy = lats - centre[1]
+		dist = np.atan2(dy, dx)
+	else:
+		dist = (lats - coords[0, 0]) ** 2 + (lons - coords[0, 1]) ** 2
 	idx = np.argsort(dist)
+	edgenums = np.array(mesh_gate['edgenums'])[idx]
 
-
-	# dx, dz = np.meshgrid(dv, z)
-
-	# load data, subset edges
-	data = get_mpaso_file_by_date(1950, 1, 'historical0101').isel(Time=0)
-	f = data['timeMonthly_avg_normalVelocity'].isel(nEdges=mesh_gate['edgenums'])
-	sign, dots = edge_sign_for_direction(mesh=mesh, target=[0, -1])
-
+	# calculate edge area
 	dv = mesh.dvEdge.values[idx]
-	dx = np.cumsum(dv*np.abs(dots)) / 1000
+	dx = np.cumsum(dv)
+	dv = np.tile(dv, (80, 1))
+	dA = dv * dz[:,idx]
 
-	sign = np.tile(sign[idx], (80, 1))
-	dots = np.tile(dots[idx], (80, 1))
-	y = f.values.squeeze()[idx, :].T * sign1[:, idx]
-	x = f.values.squeeze()[idx, :].T * dots
-	print()
+	startdate = dt.datetime(1950, 1, 1)
+	enddate = dt.datetime(2015, 1, 1)
+	dates = make_monthly_date_list(startdate, enddate)
+	outfile = f'/global/cfs/cdirs/m1199/romina/data/timeseries/mleflowrate_{mask_name}_edges_ts_historical.nc'
+	runs = ['historical0101', 'historical0151', 'historical0201', 'historical0251', 'historical0301']
 
-	plt.pcolormesh(dx, z, y, cmap='coolwarm')
-	plt.clim(-0.5, 0.5)
-	# flux[~bathmask] = np.nan
+	for runname in runs:
+		print(runname)
+		da_new = None
+		for date in tqdm(dates):
+			data = get_mpaso_file_by_date(1950, 1, 'historical0101').isel(Time=0)
+			f = data['timeMonthly_avg_normalMLEvelocity'].isel(nEdges=edgenums)
+			y = f.values.squeeze().T * sign[:, idx]
+			y[~bathmask[:, idx]] = np.nan
+			f.data = y.T
+
+			if da_new is not None:
+				da_new = xr.concat([da_new, f], dim='Time')
+			else:
+				da_new = f
+			f.close()
+
+		ds_new = xr.Dataset({'vmlenormedge': da_new})
+		# --- Save / Append logic ---
+		if os.path.exists(outfile):
+			print("Appending to existing file...")
+
+			# ds_existing = xr.open_dataset(outfile)
+
+			with xr.open_dataset(outfile) as ds_existing:
+				ds_combined = xr.concat([ds_existing, ds_new], dim='runname')
+
+				# Combine along runname dimension
+				ds_combined = xr.concat([ds_existing, ds_new], dim='runname')
+
+				# Optional: remove duplicate runnames if rerunning
+				_, index = np.unique(ds_combined['runname'], return_index=True)
+				ds_combined = ds_combined.isel(runname=index)
+
+			ds_combined.to_netcdf(outfile, mode='w')
+
+		else:
+			print("Creating new file...")
+			# ds_new.assign_coords(runname=)
+			ds_new.attrs['units'] = 'sverdrup'
+			ds_new.attrs['positive_direction'] = 'inward',
+			ds_new.attrs['description'] = 'Volume transport into central Lab Sea'
+			ds_new["edgeLength"] = xr.DataArray(mesh.dvEdge.values[idx], dims='nEdges')
+			ds_new["edgeArea"] = xr.DataArray(dA, dims=['nVertLevels', 'nEdges'])
+			ds_new["z"] = xr.DataArray(dz[:,idx], dims=['nVertLevels', 'nEdges'])
+			ds_new = ds_new.assign_coords(nEdges=("nEdges", edgenums[idx]))
+			ds_new.to_netcdf(outfile)
+
+	# plotting
+	cmap = plt.get_cmap(cmapname).copy()
+	plt.pcolormesh(dx/1000, z, y*dA/1e6, cmap=cmap)
+	plt.clim(-0.3, 0.3)
 	cbar = plt.colorbar()
-
 	ax = plt.gca()
 	# cs = plt.contour(x, z, flux[:,idx], c='k', levels=[35, 35.1, 35.2, 35.3])
 	# ax.clabel(cs, cs.levels, fontsize=10)
 
 	# Set the color for NaN values (e.g., 'gray' or 'red')
-	# cmap.set_bad(color='tab:gray')
+	cmap.set_bad(color='tab:gray')
 
-	# maxdepth = np.argwhere(np.any(bathmask, axis=1))[-1, 0]
-	# # print(z[maxdepth + 1])
-	plt.ylim([0, 3500])
+	maxdepth = np.argwhere(np.any(bathmask, axis=1))[-1, 0]
+	plt.ylim([0, z[maxdepth + 1]])
 
 	ax.invert_yaxis()
 	plt.ylabel('Depth (m)')
+	cbar.set_label('Transport (Sv)')
 	plt.xlabel('Distance along gate (km)')
 	plt.show()
-	# theta = angleedge - np.atan(norm[0]/norm[1])
-
 
 if __name__ == '__main__':
-	print('4')
+	print('7')
 
 	root = 'regional_masks/flux_gates/'
-	fname = 'ar7_approx'
-	# fname = 'LabSea_central2'
-	gate_line = gpd.read_file(root + fname + '.geojson')
+	fname, poly = 'ar7_approx', False
+	# fname, poly = 'LabSea_central2', True
+	# gate_line = gpd.read_file(root + fname + '.geojson')
 	# if not os.path.exists(root + fname + '_edges.json'):
 	# 	make_flux_gate_mask(root, fname, edges=True)
 
-	edgeflux_dataset(fname, False, [3,4])
+	edgeflux_dataset(fname, poly)
 
-	mesh_gate = json.load(open(root + fname + '.json'))
-	mask = np.array(mesh_gate['mask']).astype(bool)
+	# mesh_gate = json.load(open(root + fname + '.json'))
+	# mask = np.array(mesh_gate['mask']).astype(bool)
 
 	# cellnums = np.array(mesh_gate['cellnums'])
 	# positive_quadrant = [1,2]

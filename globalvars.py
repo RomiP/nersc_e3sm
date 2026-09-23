@@ -31,6 +31,8 @@ VARNAMES = {
 	'sst': 'timeMonthly_avg_seaSurfaceTemperature',
 	'swhf': 'timeMonthly_avg_shortWaveHeatFlux',
 	'vmeridional': 'timeMonthly_avg_velocityMeridional',
+	'vnormedge': 'timeMonthly_avg_normalVelocity',
+	'vmlenormedge': 'timeMonthly_avg_normalMLEvelocity',
 	'vzonal': 'timeMonthly_avg_velocityZonal',
 }
 
@@ -38,7 +40,7 @@ COMPONENTS = {'composites': ['qnet', 'eke'],
 			  'atm': [],
 			  'ice': ['sic', 'isice', 'sic', 'siv'],
 			  'ocn': ['maxMLD', 'bvfml', 'lwhfd', 'lwhfu', 'swhf', 'qsens', 'qlat', 'sal', 'ocntemp', 'pdens',
-					  'bvfml', 'brn', 'bld', 'vzonal', 'vmeridional', 'mlev', 'ssh']}
+					  'bvfml', 'brn', 'bld', 'vzonal', 'vmeridional', 'vnormedge', 'vmlenormedge', 'mlev', 'ssh']}
 
 MESHFILE_OCN = ('/global/cfs/cdirs/e3sm/inputdata/ocn/mpas-o/ARRM10to60E2r1/'
 				'mpaso.ARRM10to60E2r1.rstFrom1monthG-chrys.220802.nc')
