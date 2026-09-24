@@ -679,11 +679,11 @@ def edgeflux_dataset(mask_name, polygon=False, normalvec=[0,1], cmapname='coolwa
 	plt.show()
 
 if __name__ == '__main__':
-	print('7')
+	print('1')
 
 	root = 'regional_masks/flux_gates/'
-	fname, poly = 'ar7_approx', False
-	# fname, poly = 'LabSea_central2', True
+	# fname, poly = 'ar7_approx', False
+	fname, poly = 'LabSea_central2', True
 	# gate_line = gpd.read_file(root + fname + '.geojson')
 	# if not os.path.exists(root + fname + '_edges.json'):
 	# 	make_flux_gate_mask(root, fname, edges=True)
