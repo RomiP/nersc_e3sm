@@ -543,7 +543,32 @@ def plot_eke_composites():
 	plt.show()
 
 
+def mess_with_MLEvelocity():
+	datapath = '/global/cfs/cdirs/m1199/romina/data/timeseries/mleflowrate_LabSea_central2_edges_ts_historical.nc'
+	mledat = xr.open_dataset(datapath)
+
+	# data = mledat.resample(Time="YS").mean()
+	# # plt.title(f'{ds["description"]} (yearly mean)')
+
+
+	data = mledat.groupby("Time.month").mean(dim="Time")
+	data = data.assign_coords(month=MONTHS)
+	data = data.rename({'month':'Time'})
+
+	x = data['edgeLength'].isel(runname=0, Time=0)/1000
+	x = np.cumsum(x)
+	z = mpaso_depth()
+	plt.pcolormesh(x, z, data['flowrate'].isel(Time=0, runname=0 ).values.T)
+	plt.xlim([0,np.max(x)])
+	plt.ylim([0, 3500])
+	ax = plt.gca()
+	ax.invert_yaxis()
+	plt.colorbar()
+	plt.show()
+
+
 if __name__ == '__main__':
+	print('5')
 	# supported values are ['gtk3agg', 'gtk3cairo', 'gtk4agg', 'gtk4cairo', 'macosx', 'nbagg', 'notebook', 'qtagg',
 	# 'qtcairo', 'qt5agg', 'qt5cairo', 'tkagg', 'tkcairo', 'webagg', 'wx', 'wxagg', 'wxcairo', 'agg', 'cairo', 'pdf',
 	# 'pgf', 'ps', 'svg', 'template', 'module://backend_interagg', 'inline']
@@ -552,7 +577,8 @@ if __name__ == '__main__':
 
 	# putz_w_labsea_dcmask()
 
-	plot_transport_ts('osnap_west_GS')
+	# plot_transport_ts('osnap_west_GS')
+	mess_with_MLEvelocity()
 
 	# unstructured_pcolor(0,0,0)
 	# open_some_data()

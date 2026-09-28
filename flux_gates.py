@@ -614,7 +614,7 @@ def edgeflux_dataset(mask_name, polygon=False, normalvec=[0,1], cmapname='coolwa
 		print(runname)
 		da_new = None
 		for date in tqdm(dates):
-			data = get_mpaso_file_by_date(1950, 1, 'historical0101').isel(Time=0)
+			data = get_mpaso_file_by_date(date.year, date.month, runname).isel(Time=0)
 			f = data['timeMonthly_avg_normalMLEvelocity'].isel(nEdges=edgenums)
 			y = f.values.squeeze().T * sign[:, idx]
 			y[~bathmask[:, idx]] = np.nan
@@ -626,7 +626,7 @@ def edgeflux_dataset(mask_name, polygon=False, normalvec=[0,1], cmapname='coolwa
 				da_new = f
 			f.close()
 
-		ds_new = xr.Dataset({'vmlenormedge': da_new})
+		ds_new = xr.Dataset({'flowrate': da_new})
 		# --- Save / Append logic ---
 		if os.path.exists(outfile):
 			print("Appending to existing file...")
@@ -679,7 +679,7 @@ def edgeflux_dataset(mask_name, polygon=False, normalvec=[0,1], cmapname='coolwa
 	plt.show()
 
 if __name__ == '__main__':
-	print('1')
+	print('2')
 
 	root = 'regional_masks/flux_gates/'
 	# fname, poly = 'ar7_approx', False
