@@ -650,7 +650,7 @@ def edgeflux_dataset(mask_name, polygon=False, normalvec=[0,1], cmapname='coolwa
 			# ds_new.assign_coords(runname=)
 			ds_new.attrs['units'] = 'sverdrup'
 			ds_new.attrs['positive_direction'] = 'inward',
-			ds_new.attrs['description'] = 'Volume transport into central Lab Sea'
+			ds_new.attrs['description'] = 'Volume transport into model deep covevction zone Lab Sea'
 			ds_new["edgeLength"] = xr.DataArray(mesh.dvEdge.values[idx], dims='nEdges')
 			ds_new["edgeArea"] = xr.DataArray(dA, dims=['nVertLevels', 'nEdges'])
 			ds_new["z"] = xr.DataArray(dz[:,idx], dims=['nVertLevels', 'nEdges'])
@@ -678,12 +678,13 @@ def edgeflux_dataset(mask_name, polygon=False, normalvec=[0,1], cmapname='coolwa
 	plt.xlabel('Distance along gate (km)')
 	plt.show()
 
+
 if __name__ == '__main__':
 	print('2')
 
 	root = 'regional_masks/flux_gates/'
 	# fname, poly = 'ar7_approx', False
-	fname, poly = 'LabSea_central2', True
+	fname, poly = 'model_dczone', True
 	# gate_line = gpd.read_file(root + fname + '.geojson')
 	# if not os.path.exists(root + fname + '_edges.json'):
 	# 	make_flux_gate_mask(root, fname, edges=True)

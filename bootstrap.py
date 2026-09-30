@@ -24,6 +24,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from mpl_toolkits.mplot3d.proj3d import proj_transform
 
+import nc_time_axis
 import numpy as np
 
 import os

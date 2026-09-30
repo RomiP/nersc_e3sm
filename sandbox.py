@@ -3,7 +3,6 @@
 # import cartopy.crs as ccrs
 # import geopandas as gpd
 import json
-
 from helpers import *
 import matplotlib
 import matplotlib.pyplot as plt
@@ -546,10 +545,18 @@ def plot_eke_composites():
 def mess_with_MLEvelocity():
 	datapath = '/global/cfs/cdirs/m1199/romina/data/timeseries/mleflowrate_LabSea_central2_edges_ts_historical.nc'
 	mledat = xr.open_dataset(datapath)
+	z = mpaso_depth()
+	iz= np.argmin(np.abs(z-50)).squeeze()
 
 	# data = mledat.resample(Time="YS").mean()
 	# # plt.title(f'{ds["description"]} (yearly mean)')
 
+	mlets = mledat.isel(nVertLevels=slice(0, iz)).mean(dim=['nVertLevels', 'nEdges'], skipna=True)
+	for i in range(5):
+		plt.plot(mlets['Time'].values, mlets['flowrate'].isel(runname=i),
+				 label=ENSEMBLE[i], alpha=0.2)
+	plt.legend()
+	plt.show()
 
 	data = mledat.groupby("Time.month").mean(dim="Time")
 	data = data.assign_coords(month=MONTHS)
@@ -557,18 +564,21 @@ def mess_with_MLEvelocity():
 
 	x = data['edgeLength'].isel(runname=0, Time=0)/1000
 	x = np.cumsum(x)
-	z = mpaso_depth()
-	plt.pcolormesh(x, z, data['flowrate'].isel(Time=0, runname=0 ).values.T)
-	plt.xlim([0,np.max(x)])
-	plt.ylim([0, 3500])
-	ax = plt.gca()
-	ax.invert_yaxis()
-	plt.colorbar()
-	plt.show()
+	# for i in range(12):
+	# 	plt.pcolormesh(x, z, data['flowrate'].isel(Time=i, runname=2).values.T, cmap='coolwarm')
+	# 	plt.title(MONTHS[i])
+	# 	plt.xlim([0,np.max(x)])
+	# 	plt.ylim([0, 500])
+	# 	plt.clim([-0.02, 0.02])
+	# 	ax = plt.gca()
+	# 	ax.invert_yaxis()
+	# 	plt.colorbar()
+	# 	plt.show()
+
 
 
 if __name__ == '__main__':
-	print('5')
+	print('2')
 	# supported values are ['gtk3agg', 'gtk3cairo', 'gtk4agg', 'gtk4cairo', 'macosx', 'nbagg', 'notebook', 'qtagg',
 	# 'qtcairo', 'qt5agg', 'qt5cairo', 'tkagg', 'tkcairo', 'webagg', 'wx', 'wxagg', 'wxcairo', 'agg', 'cairo', 'pdf',
 	# 'pgf', 'ps', 'svg', 'template', 'module://backend_interagg', 'inline']
