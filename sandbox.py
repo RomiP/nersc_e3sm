@@ -3,6 +3,8 @@
 # import cartopy.crs as ccrs
 # import geopandas as gpd
 import json
+
+from combine_subset_e3sm import compute_eke
 from helpers import *
 import matplotlib
 import matplotlib.pyplot as plt
@@ -470,14 +472,15 @@ def plot_transport_ts(gatename):
 
 def plot_eke_composites():
 	runname = 'historical0301'
+	print(runname)
 	runnum = ENSEMBLE.index(runname)
 	k = 5
 	jfile = open('maxMLD_dcmean_ts_historical_sorted.json')
 	mldsorted = json.load(jfile)
 	jfile.close()
 
-	# depthlim = [500, 2000]
-	depthlim = [0, 500]
+	depthlim = [500, 2000]
+	# depthlim = [0, 500]
 
 
 	mesh = xr.open_dataset(MESHFILE_OCN)
@@ -543,7 +546,7 @@ def plot_eke_composites():
 
 
 def mess_with_MLEvelocity():
-	datapath = '/global/cfs/cdirs/m1199/romina/data/timeseries/mleflowrate_LabSea_central2_edges_ts_historical.nc'
+	datapath = '/global/cfs/cdirs/m1199/romina/data/timeseries/mleflowrate_model_dczone_edges_ts_historical.nc'
 	mledat = xr.open_dataset(datapath)
 	z = mpaso_depth()
 	iz= np.argmin(np.abs(z-50)).squeeze()
@@ -551,12 +554,12 @@ def mess_with_MLEvelocity():
 	# data = mledat.resample(Time="YS").mean()
 	# # plt.title(f'{ds["description"]} (yearly mean)')
 
-	mlets = mledat.isel(nVertLevels=slice(0, iz)).mean(dim=['nVertLevels', 'nEdges'], skipna=True)
-	for i in range(5):
-		plt.plot(mlets['Time'].values, mlets['flowrate'].isel(runname=i),
-				 label=ENSEMBLE[i], alpha=0.2)
-	plt.legend()
-	plt.show()
+	# mlets = mledat.isel(nVertLevels=slice(0, iz)).mean(dim=['nVertLevels', 'nEdges'], skipna=True)
+	# for i in range(5):
+	# 	plt.plot(mlets['Time'].values, mlets['flowrate'].isel(runname=i),
+	# 			 label=ENSEMBLE[i], alpha=0.2)
+	# plt.legend()
+	# plt.show()
 
 	data = mledat.groupby("Time.month").mean(dim="Time")
 	data = data.assign_coords(month=MONTHS)
@@ -564,31 +567,69 @@ def mess_with_MLEvelocity():
 
 	x = data['edgeLength'].isel(runname=0, Time=0)/1000
 	x = np.cumsum(x)
-	# for i in range(12):
-	# 	plt.pcolormesh(x, z, data['flowrate'].isel(Time=i, runname=2).values.T, cmap='coolwarm')
-	# 	plt.title(MONTHS[i])
-	# 	plt.xlim([0,np.max(x)])
-	# 	plt.ylim([0, 500])
-	# 	plt.clim([-0.02, 0.02])
-	# 	ax = plt.gca()
-	# 	ax.invert_yaxis()
-	# 	plt.colorbar()
-	# 	plt.show()
+	for i in range(12):
+		plt.pcolormesh(x, z, data['flowrate'].isel(Time=i, runname=0).values.T, cmap='coolwarm')
+		plt.title(MONTHS[i])
+		plt.xlim([0,np.max(x)])
+		plt.ylim([0, 500])
+		plt.clim([-0.02, 0.02])
+		ax = plt.gca()
+		ax.invert_yaxis()
+		plt.colorbar()
+		plt.show()
+
+
+def plot_eke():
+	root = 'regional_masks/'
+	fname, poly = 'LabSea_whole', True
+
+
+	poly_gdf = gpd.read_file(root + fname + ".geojson")
+	polygon = poly_gdf.union_all()
+	# Create points from mesh cell centers
+	mesh = xr.open_dataset(MESHFILE_OCN)
+	lat, lon, _ = mpaso_mesh_latlon(mesh)
+	z = mpaso_depth(mesh)
+	depth = [0,500]
+
+	points = gpd.GeoSeries(
+		[Point(x, y) for x, y in zip(lon, lat)],
+		crs="EPSG:4326"
+	)
+	# Boolean mask
+	mask = points.within(polygon)
+	# Subset mesh cells
+	cell_ids = np.where(mask)[0]
+
+	dat = get_mpaso_file_by_date(1950, 1, 'historical0201')
+	dat = dat.isel(nCells=cell_ids)
+	eke = compute_eke(dat)
+	eke_subset = eke.isel(nVertLevels=slice(0, np.argmin(np.abs(z-depth[1])).squeeze())).mean(dim='nVertLevels', skipna=True)
+	unstructured_pcolor(lat[mask], lon[mask], eke_subset,
+						dotsize=1, clim=[0, 0.1],
+						title=f"EKE at depth={depth}m",
+						clabel='EKE ($m^2/s^2$)')
+	plt.show()
+
+
+
 
 
 
 if __name__ == '__main__':
-	print('2')
+	print('3')
 	# supported values are ['gtk3agg', 'gtk3cairo', 'gtk4agg', 'gtk4cairo', 'macosx', 'nbagg', 'notebook', 'qtagg',
 	# 'qtcairo', 'qt5agg', 'qt5cairo', 'tkagg', 'tkcairo', 'webagg', 'wx', 'wxagg', 'wxcairo', 'agg', 'cairo', 'pdf',
 	# 'pgf', 'ps', 'svg', 'template', 'module://backend_interagg', 'inline']
 	matplotlib.use('module://backend_interagg')
 	# print(matplotlib.get_backend())
 
+	# data = get_mpaso_file_by_date(1950, 1, 'historical0101')
+
 	# putz_w_labsea_dcmask()
 
 	# plot_transport_ts('osnap_west_GS')
-	mess_with_MLEvelocity()
+	# mess_with_MLEvelocity()
 
 	# unstructured_pcolor(0,0,0)
 	# open_some_data()
@@ -601,7 +642,9 @@ if __name__ == '__main__':
 	# plot_field_by_date(dt.datetime(1950,1,1),'ssh', '0101')
 	# plt.show()
 
-	# plot_eke_composites()
+	plot_eke_composites()
+
+	# plot_eke()
 
 	# %% Make some one-off plots of qnet for weird convection years
 

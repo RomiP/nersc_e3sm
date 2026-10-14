@@ -102,7 +102,7 @@ def compute_climo():
 
 		ds_new.close()
 
-def make_EKE_field():
+def make_EKE_field_badversion():
 	startdate = dt.datetime(1950, 1, 1)
 	enddate = dt.datetime(2015, 1, 1)
 	datelist = make_monthly_date_list(startdate, enddate)
@@ -149,6 +149,53 @@ def make_EKE_field():
 		ds_new.to_netcdf(outfile)
 
 		ds_new.close()
+
+def compute_eke(data=None, **kwargs):
+	if data is None:
+		data = get_mpaso_file_by_date(kwargs['date'].year, kwargs['date'].month, kwargs['runname'])
+	u = data['timeMonthly_avg_velocityZonal']
+	v = data['timeMonthly_avg_velocityMeridional']
+	u2 = data['timeMonthly_avg_velocityZonalSquared']
+	v2 = data['timeMonthly_avg_velocityMeridionalSquared']
+
+	u_var = u2 - u**2
+	v_var = v2 - v**2
+
+	eke = 1/2*(u_var + v_var)
+	return eke
+
+def make_EKE_dataset_properly():
+	# todo: implement this
+	startdate = dt.datetime(1950, 1, 1)
+	enddate = dt.datetime(2015, 1, 1)
+	datelist = make_monthly_date_list(startdate, enddate)
+	runs = ['historical0101', 'historical0151', 'historical0201', 'historical0251', 'historical0301']
+	outdir = '/global/cfs/cdirs/m1199/romina/data/composite_fields/eke_historical/'
+
+
+	for date in tqdm(datelist):
+		fname = f'eke_historical_{date.year}-{date.month:02}.nc'
+		if os.path.exists(outdir + fname):
+			continue
+		da_new = None
+		for runname in runs:
+
+			data = get_mpaso_file_by_date(date.year, date.month, runname).isel(Time=0)
+			f = compute_eke(data)
+
+			if da_new is not None:
+				da_new = xr.concat([da_new, f], dim='runname')
+			else:
+				da_new = f
+			f.close()
+
+		ds_new = xr.Dataset({'eke': da_new})
+		ds_new = ds_new.assign_coords(runname=runs)
+		ds_new.attrs['units'] = 'm^2 / s^2'
+		ds_new.attrs['description'] = 'Eddy kinetic energy as calculated by 1/2*(avg(u^2) - avg(u)^2)'
+		# print(ds_new.dims)
+		ds_new.to_netcdf(outdir +fname)
+
 
 def extract_ts_from_composite_file():
 	type = 'historical'
@@ -380,6 +427,7 @@ def make_CDT_prof_dataset(runnum):
 	print()
 
 if __name__ == '__main__':
+	print(2)
 	# %% date ranges and params
 
 	# startdate = dt.datetime(1, 1, 1)
@@ -402,16 +450,15 @@ if __name__ == '__main__':
 	# make_qnet_field(startdate, enddate, runs, type)
 
 	# extract_ts_from_composite_file()
-	print('1')
+	# print('1')
 	# make_regionalavg_ts_dataset('sal', 'PSU')
 	# starts from 0251
 	# regional_avg_dataset(['sal', 'ocntemp', 'pdens', 'brn'], 'regional_masks/flux_gates/osnap_west_GS.json')
 	# regional_avg_dataset(['vmeridional', 'vzonal', 'bvfml'], 'regional_masks/model_dczone.geojson')
 	# for run in ['0101', '0151', '0251', '0301']:
 	# 	make_CDT_prof_dataset(run)
-	compute_climo()
-	# make_EKE_field()
-
+	# compute_climo()
+	make_EKE_dataset_properly()
 
 
 

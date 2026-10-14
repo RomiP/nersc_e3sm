@@ -33,7 +33,7 @@ from pyproj import Geod
 
 import shapely
 import shapely.geometry as geom
-from shapely.geometry import Polygon, LineString
+from shapely.geometry import Polygon, LineString, Point
 from shapely.ops import unary_union, polygonize
 
 from tqdm import tqdm
