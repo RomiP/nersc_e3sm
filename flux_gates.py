@@ -508,11 +508,11 @@ def flux_ts(data, gatemask, gateline, depth=None, posquad=None):
 	flux = np.array(flux)
 	return flux
 
-def plot_TS_diagram(data, runnum, depth, mask):
+def plot_TS_diagram(data, mask, **kwargs):
 	data = data.mean(dim='Time')
 	z = mpaso_depth()
 	n = len(z)
-	zidx = np.argmin(np.abs(z-depth))
+	# zidx = np.argmin(np.abs(z-depth))
 
 	mesh = xr.open_dataset(MESHFILE_OCN).isel(Time=0)
 	dz = mesh.layerThickness.values[mask, :].T
@@ -528,17 +528,26 @@ def plot_TS_diagram(data, runnum, depth, mask):
 				cmap='viridis', alpha=0.2)
 	plt.colorbar()
 
-	s = np.linspace(np.nanmin(s), np.nanmax(s), 20, endpoint=True)
-	t = np.linspace(np.nanmin(t), np.nanmax(t), 20, endpoint=True)
+	s = np.linspace(np.nanmin(s)- 0.5, np.nanmax(s) + 0.5, 20, endpoint=True)
+	t = np.linspace(np.nanmin(t)-1, np.nanmax(t) + 1, 20, endpoint=True)
 	s, t = np.meshgrid(s, t)
-	dens = rho(s, t, depth)
+	dens = rho(s, t)
 
 	cs = plt.contour(s, t, dens, colors='k', linestyles='--')
 	# Add labels to the contours
 	plt.clabel(cs, inline=True, fontsize=10)
 
+	t_freeze = freezing_temp(s[0])
+	plt.plot(s[0], t_freeze)
+
 	plt.xlabel('Salinity (PSU)')
 	plt.ylabel('Temperature ($^\circ$C)')
+
+	if 'title' in kwargs:
+		plt.title(kwargs['title'])
+	if 'saveas' in kwargs:
+		plt.savefig(kwargs['saveas'])
+
 	plt.show()
 
 # 	todo: add freezing point to TS diagram
@@ -680,20 +689,22 @@ def edgeflux_dataset(mask_name, polygon=False, normalvec=[0,1], cmapname='coolwa
 
 
 if __name__ == '__main__':
-	print('2')
+	print('5')
 
 	root = 'regional_masks/flux_gates/'
-	# fname, poly = 'ar7_approx', False
-	fname, poly = 'model_dczone', True
+	fname, poly = 'ar7_approx', False
+	# fname, poly = 'model_dczone', True
 	# gate_line = gpd.read_file(root + fname + '.geojson')
 	# if not os.path.exists(root + fname + '_edges.json'):
 	# 	make_flux_gate_mask(root, fname, edges=True)
 
-	edgeflux_dataset(fname, poly)
+	# edgeflux_dataset(fname, poly)
 
-	# mesh_gate = json.load(open(root + fname + '.json'))
-	# mask = np.array(mesh_gate['mask']).astype(bool)
+	mesh_gate = json.load(open(root + fname + '.json'))
+	mask = np.array(mesh_gate['mask']).astype(bool)
 
+
+	# %%
 	# cellnums = np.array(mesh_gate['cellnums'])
 	# positive_quadrant = [1,2]
 	# par = False
@@ -735,25 +746,26 @@ if __name__ == '__main__':
 	# 					 )
 	# plt.show()
 
-	# # flux_ts(data, mask, gate_line)
-	# # flux_index_dataset('model_dczone')
-	# #
-	# # ystep = 10
-	# # for runnum in ['historical0101', 'historical0151', 'historical0201', 'historical0251', 'historical0301']:
-	# # 	print('\t' + runnum)
-	# #
-	# # 	for i in range(1950, 2015, ystep):
-	# # 		print(i, min(2014, i+ystep))
-	# # 		dates = make_monthly_date_list(dt.datetime(i, 1, 1),
-	# # 									   dt.datetime(min(2015, i + ystep), 1, 1))
-	# #
-	# # 		data = zip_subset_by_time(dates, get_mpaso_file_by_date, ['sal', 'ocntemp'], runname=runnum)
-	# #
-	# # 		plot_normal_velocity(dates, runnum, par=par)
-	# # 		plot_crosssection(data, runnum, 'ocntemp', mask)
-	# # 		plot_crosssection(data, runnum, 'sal', mask)
-	# # 		plot_TS_diagram(data, runnum, mask)
-	#
+	# flux_ts(data, mask, gate_line)
+	# flux_index_dataset('model_dczone')
+
+	ystep = 10
+	for runnum in ['historical0101', 'historical0151', 'historical0201', 'historical0251', 'historical0301']:
+		print('\t' + runnum)
+
+		for i in range(1950, 2015, ystep):
+			print(i, min(2014, i+ystep))
+			dates = make_monthly_date_list(dt.datetime(i, 1, 1),
+										   dt.datetime(min(2015, i + ystep), 1, 1),
+										   months=[1,2,3])
+
+			data = zip_subset_by_time(dates, get_mpaso_file_by_date, ['sal', 'ocntemp'], runname=runnum)
+
+			# plot_normal_velocity(dates, runnum, par=par)
+			# plot_crosssection(data, runnum, 'ocntemp', mask)
+			# plot_crosssection(data, runnum, 'sal', mask)
+			plot_TS_diagram(data, mask)
+
 
 
 	# %% Create mask and plot fluxgate

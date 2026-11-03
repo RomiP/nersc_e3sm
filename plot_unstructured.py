@@ -5,6 +5,7 @@ import cartopy.feature as cfeature
 from cartopy.feature import ShapelyFeature
 import cartopy.mpl.ticker as ctk
 import cmasher as cmr
+import geopandas as gpd
 import holoviews as hv
 import matplotlib
 import matplotlib.cm as cm
@@ -99,6 +100,8 @@ def unstructured_pcolor(lat, lon, dat=None, **kwargs):
 		kwargs['landmask'] = False
 	if not 'interp' in kwargs:
 		kwargs['interp'] = False
+	if not 'dc_contour' in kwargs:
+		kwargs['dc_contour'] = False
 	if not 'norm' in kwargs:
 		kwargs['norm'] = None
 	else:
@@ -244,6 +247,14 @@ def unstructured_pcolor(lat, lon, dat=None, **kwargs):
 	# fig_height = fig_width * aspect
 	#
 	# fig.set_size_inches(fig_width*1.5, fig_height, forward=True)
+
+	if kwargs['dc_contour']:
+		gdf = gpd.read_file('regional_masks/model_dczone.geojson')
+		# 3. Create a ShapelyFeature
+		geoms = gdf.geometry.values
+		feat = ShapelyFeature(geoms, ccrs.PlateCarree(), edgecolor='red', facecolor='none')
+		# 4. Add to cartopy
+		ax.add_feature(feat)
 
 	if 'sc_handle' in kwargs and kwargs['sc_handle']:
 		return fig, ax, colplot

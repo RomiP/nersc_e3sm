@@ -61,10 +61,11 @@ def normalize(x: np.ndarray) -> np.ndarray:
 	return norm
 
 
-def make_monthly_date_list(startdate: dt.datetime, enddate: dt.datetime) -> list[dt.datetime]:
+def make_monthly_date_list(startdate: dt.datetime, enddate: dt.datetime, months=[]) -> list[dt.datetime]:
 	dates = []
 	while startdate < enddate:
-		dates.append(startdate)
+		if not months or startdate.month in months:
+			dates.append(startdate)
 		startdate += relativedelta(months=1)
 	return dates
 
@@ -241,7 +242,7 @@ def quadrant(v):
 	choices = [1, 2, 3, 4]
 	return np.select(conds, choices, default=0)  # 0 for axes/origin
 
-def rho(s,t,z=100, lat=45, lon=0):
+def rho(s,t,z=0, lat=45, lon=0):
 
 	p = gsw.p_from_z(-z, lat)
 
@@ -250,6 +251,21 @@ def rho(s,t,z=100, lat=45, lon=0):
 
 	return gsw.rho(SA, CT, p)
 
+def freezing_temp(s, z=0, airsat=1, lat=45, lon=0):
+	'''
+
+	:param s: salinty (PSU)
+	:param z: depth (m)
+	:param airsat: Saturation fraction of dissolved air in seawater [0 ... 1]
+	:return: in situ freezing temperature (C)
+	'''
+
+	p = gsw.p_from_z(-z, lat)
+	if type(p) == np.ndarray:
+		s,p = np.meshgrid(s, p)
+	sa = gsw.SA_from_SP(s, p, lon, lat)
+	ct = gsw.CT_freezing(sa, p, airsat)
+	return gsw.t_from_CT(sa, ct, p)
 
 def rho_e3sm(data, cellmask=None, potentialdensity=100):
 	mesh = xr.open_dataset(MESHFILE_OCN).isel(Time=0)
@@ -328,6 +344,8 @@ if __name__ == '__main__':
 	# # d = rho_e3sm(data, mask)
 	# n2 = N2_e3sm(data, mask)
 
-	mesh = xr.open_dataset(MESHFILE_OCN)
-	lons, lats, ncells = mpaso_mesh_latlon(mesh)
-	mask = geopolygon_mask('regional_masks/LabIrm.geojson', lons, lats)
+	# mesh = xr.open_dataset(MESHFILE_OCN)
+	# lons, lats, ncells = mpaso_mesh_latlon(mesh)
+	# mask = geopolygon_mask('regional_masks/LabIrm.geojson', lons, lats)
+
+	print(freezing_temp(np.arange(30, 35), z=np.array([10, 20, 30])))

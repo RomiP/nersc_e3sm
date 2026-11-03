@@ -1,7 +1,3 @@
-# from cProfile import label
-#
-# import cartopy.crs as ccrs
-# import geopandas as gpd
 import json
 
 from combine_subset_e3sm import compute_eke
@@ -168,7 +164,6 @@ def open_some_data():
 	plt.title(vartitle + ' ' + figtitle)
 	plt.show()
 
-
 def plot_regional_avg_max_mld():
 	months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 	ystart = 1950
@@ -198,7 +193,6 @@ def plot_regional_avg_max_mld():
 	plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax)
 	plt.show()
 
-
 def plot_atm_data():
 	y = 1960
 	m = 1
@@ -213,7 +207,6 @@ def plot_atm_data():
 								  gridlines=True,
 								  interp=True)
 	plt.show()
-
 
 def playing_with_plotly():
 	import plotly.graph_objects as go
@@ -232,8 +225,6 @@ def playing_with_plotly():
 	)
 
 	fig.show()
-
-
 
 def plot_qnet_data():
 	runtype = 'historical'
@@ -271,7 +262,6 @@ def plot_qnet_data():
 
 	plt.savefig(f'figs/qnet_climo_oct-mar_{runtype}{runnum}.png')
 	plt.show()
-
 
 def plot_heatmap(runnum):
 	runtype = 'historical'
@@ -469,9 +459,8 @@ def plot_transport_ts(gatename):
 
 	plt.show()
 
-
 def plot_eke_composites():
-	runname = 'historical0301'
+	runname = 'historical0101'
 	print(runname)
 	runnum = ENSEMBLE.index(runname)
 	k = 5
@@ -479,8 +468,8 @@ def plot_eke_composites():
 	mldsorted = json.load(jfile)
 	jfile.close()
 
-	depthlim = [500, 2000]
-	# depthlim = [0, 500]
+	# depthlim = [500, 2000]
+	depthlim = [0, 50]
 
 
 	mesh = xr.open_dataset(MESHFILE_OCN)
@@ -501,7 +490,8 @@ def plot_eke_composites():
 	iz1 = np.argmin(np.abs(z - depthlim[0])).squeeze()
 	iz2 = np.argmin(np.abs(z - depthlim[1])).squeeze()
 
-	months = [i + 1 for i in range(12)]
+	months = [i + 1 for i in range(0, 3)]
+	monthsstr = 'JFM'
 
 	compmin = load_composites(yrs_min, months, 'eke',
 							  {'nCells': ncells, 'runname':runnum})
@@ -517,23 +507,25 @@ def plot_eke_composites():
 
 	plotargs = dict(
 		# projname='PlateCarree',
-		# extent=[-65, 0, 50, 70],
-		clim=[0, 0.01],
+		extent=[-65, -35, 50, 70],
+		clim=[0, 500],
 		cmap='turbo',
-		clabel='EKE ($m^2 / S^2$)',
+		clabel='EKE ($cm^2 / S^2$)',
 		# extenttype='tight',
 		dotsize=1,
 		gridlines=True,
+		landmask=True,
+		dc_contour=True,
 		# title=,
 	)
 
-	fig, ax = unstructured_pcolor(lats, lons, compmax['eke'].values, **plotargs)
+	fig, ax = unstructured_pcolor(lats, lons, compmax['eke'].values*10000, **plotargs)
 	plt.title(f'Deepest MLD k={k} {runname} depth={str(depthlim)}')
-	plt.savefig(f'figs/eke_k={k}max_{runname}_{depthlim[0]}-{depthlim[1]}m.png')
+	# plt.savefig(f'figs/eke_k={k}max_{runname}_{depthlim[0]}-{depthlim[1]}m_{monthsstr}.png')
 	plt.show()
-	fig, ax = unstructured_pcolor(lats, lons, compmin['eke'].values, **plotargs)
+	fig, ax = unstructured_pcolor(lats, lons, compmin['eke'].values*10000, **plotargs)
 	plt.title(f'Shallowest MLD k={k} {runname} depth={str(depthlim)}')
-	plt.savefig(f'figs/eke_k={k}min_{runname}_{depthlim[0]}-{depthlim[1]}m.png')
+	# plt.savefig(f'figs/eke_k={k}min_{runname}_{depthlim[0]}-{depthlim[1]}m_{monthsstr}.png')
 
 	plt.show()
 
@@ -541,9 +533,8 @@ def plot_eke_composites():
 	plotargs['clim'] = [-0.002, 0.002]
 	fig, ax = unstructured_pcolor(lats, lons, compmax['eke'].values - compmin['eke'].values, **plotargs)
 	plt.title(f'Diff MLD k={k} {runname} depth={str(depthlim)}')
-	plt.savefig(f'figs/eke_k={k}diff_{runname}_{depthlim[0]}-{depthlim[1]}m.png')
+	# plt.savefig(f'figs/eke_k={k}diff_{runname}_{depthlim[0]}-{depthlim[1]}m_{monthsstr}.png')
 	plt.show()
-
 
 def mess_with_MLEvelocity():
 	datapath = '/global/cfs/cdirs/m1199/romina/data/timeseries/mleflowrate_model_dczone_edges_ts_historical.nc'
@@ -577,7 +568,6 @@ def mess_with_MLEvelocity():
 		ax.invert_yaxis()
 		plt.colorbar()
 		plt.show()
-
 
 def plot_eke():
 	root = 'regional_masks/'
@@ -617,7 +607,7 @@ def plot_eke():
 
 
 if __name__ == '__main__':
-	print('3')
+	print(3)
 	# supported values are ['gtk3agg', 'gtk3cairo', 'gtk4agg', 'gtk4cairo', 'macosx', 'nbagg', 'notebook', 'qtagg',
 	# 'qtcairo', 'qt5agg', 'qt5cairo', 'tkagg', 'tkcairo', 'webagg', 'wx', 'wxagg', 'wxcairo', 'agg', 'cairo', 'pdf',
 	# 'pgf', 'ps', 'svg', 'template', 'module://backend_interagg', 'inline']
